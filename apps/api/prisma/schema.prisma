@@ -1,0 +1,446 @@
+// DOGFOOD portal data model.
+// Invariants Prisma cannot express (partial unique indexes, CHECKs, triggers) live in the
+// init migration's hand-written SQL block; see prisma/migrations/*_init/migration.sql.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventRoleType {
+  participant
+  judge
+  organizer
+}
+
+enum TeamRole {
+  captain
+  member
+}
+
+enum ProjectStatus {
+  draft
+  submitted
+  withdrawn
+  disqualified
+}
+
+enum AssignmentStatus {
+  assigned
+  in_progress
+  submitted
+  recused
+}
+
+enum ReviewStatus {
+  draft
+  submitted
+}
+
+enum CoiSource {
+  declared
+  detected
+}
+
+// ── identity ────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique // always stored lower-cased
+  name         String
+  passwordHash String? // null = cannot log in with a password (e.g. imported, not yet claimed)
+  isAdmin      Boolean  @default(false) // the only global role; everything else is per event
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  sessions       Session[]
+  eventRoles     EventRole[]
+  judgeTracks    JudgeTrack[]
+  memberships    TeamMember[]
+  teamsCreated   Team[]               @relation("TeamCreatedBy")
+  invitesCreated TeamInvite[]
+  assignments    Assignment[]
+  batchesCreated AssignmentBatch[]
+  conflicts      ConflictOfInterest[]
+  runsCreated    NormalizationRun[]
+  auditEntries   AuditLog[]
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique // sha256 of the cookie value; the raw token is never stored
+  userId    String   @db.Uuid
+  expiresAt DateTime @db.Timestamptz(3)
+  seeded    Boolean  @default(false) // demo sessions printed at boot; removed when SEED_DEMO=false
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ── event setup ─────────────────────────────────────────────────────────────
+
+model Event {
+  id                  String    @id @default(uuid()) @db.Uuid
+  slug                String    @unique
+  externalId          String?   @unique // id in an imported file, e.g. "evt_01"
+  name                String
+  description         String    @default("")
+  timezone            String    @default("UTC") // display only; every timestamp is stored in UTC
+  registrationOpensAt DateTime? @db.Timestamptz(3)
+  submissionsOpenAt   DateTime  @db.Timestamptz(3)
+  submissionsCloseAt  DateTime  @db.Timestamptz(3)
+  judgingOpensAt      DateTime? @db.Timestamptz(3)
+  judgingClosesAt     DateTime? @db.Timestamptz(3)
+  maxTeamSize         Int       @default(4)
+  publishedRunId      String?   @unique @db.Uuid // null = results hidden
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
+
+  publishedRun NormalizationRun?    @relation("PublishedRun", fields: [publishedRunId], references: [id])
+  roles        EventRole[]
+  tracks       Track[]
+  prizes       Prize[]
+  teams        Team[]
+  teamMembers  TeamMember[]
+  projects     Project[]
+  criteria     Criterion[]
+  batches      AssignmentBatch[]
+  assignments  Assignment[]
+  reviews      Review[]
+  judgeTracks  JudgeTrack[]
+  conflicts    ConflictOfInterest[]
+  runs         NormalizationRun[]   @relation("EventRuns")
+  auditEntries AuditLog[]
+}
+
+model EventRole {
+  eventId    String        @db.Uuid
+  userId     String        @db.Uuid
+  role       EventRoleType
+  externalId String? // imported person id within the event, e.g. judge "jdg_24"
+  createdAt  DateTime      @default(now()) @db.Timestamptz(3)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId, role])
+  @@unique([eventId, externalId])
+  @@index([userId])
+}
+
+model Track {
+  id          String  @id @default(uuid()) @db.Uuid
+  eventId     String  @db.Uuid
+  externalId  String?
+  name        String
+  description String  @default("")
+
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  prizes      Prize[]
+  projects    Project[]
+  judgeTracks JudgeTrack[]
+
+  @@unique([eventId, name])
+  @@unique([eventId, externalId])
+  @@unique([id, eventId]) // target for composite FKs that pin a row to the same event
+}
+
+model Prize {
+  id          String  @id @default(uuid()) @db.Uuid
+  eventId     String  @db.Uuid
+  trackId     String? @db.Uuid // null = overall prize
+  name        String
+  description String  @default("")
+  value       String  @default("") // free text: "$500", "Mentorship", ...
+  rank        Int?
+
+  event Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  track Track? @relation(fields: [trackId, eventId], references: [id, eventId], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+// Which tracks a judge may see. Judges never see projects outside their tracks.
+model JudgeTrack {
+  eventId String @db.Uuid
+  userId  String @db.Uuid
+  trackId String @db.Uuid
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId, eventId], references: [id, eventId], onDelete: Cascade)
+
+  @@id([eventId, userId, trackId])
+}
+
+// ── teams & submissions ─────────────────────────────────────────────────────
+
+model Team {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventId     String   @db.Uuid
+  externalId  String?
+  name        String
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  event     Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User?                @relation("TeamCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  members   TeamMember[]
+  invites   TeamInvite[]
+  projects  Project[]
+  conflicts ConflictOfInterest[]
+
+  @@index([eventId, name]) // not unique: real events (and the fixtures) have different teams with the same name
+  @@unique([eventId, externalId])
+  @@unique([id, eventId])
+}
+
+model TeamMember {
+  teamId   String   @db.Uuid
+  userId   String   @db.Uuid
+  eventId  String   @db.Uuid // denormalised so "one team per person per event" is a plain unique index
+  role     TeamRole @default(member)
+  joinedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  team  Team  @relation(fields: [teamId, eventId], references: [id, eventId], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@unique([eventId, userId]) // one team per person per event
+}
+
+model TeamInvite {
+  id          String    @id @default(uuid()) @db.Uuid
+  teamId      String    @db.Uuid
+  tokenHash   String    @unique
+  createdById String    @db.Uuid
+  expiresAt   DateTime  @db.Timestamptz(3)
+  maxUses     Int       @default(10)
+  uses        Int       @default(0)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id            String        @id @default(uuid()) @db.Uuid
+  eventId       String        @db.Uuid
+  teamId        String        @db.Uuid
+  trackId       String?       @db.Uuid
+  externalId    String?
+  title         String
+  tagline       String        @default("")
+  description   String        @default("")
+  repoUrl       String?
+  demoUrl       String?
+  videoUrl      String?
+  thumbnailUrl  String?
+  techTags      String[]      @default([])
+  status        ProjectStatus @default(draft)
+  submittedAt   DateTime?     @db.Timestamptz(3)
+  duplicateOfId String?       @db.Uuid // flagged duplicate; excluded from gallery and ranking
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
+
+  event       Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  team        Team            @relation(fields: [teamId, eventId], references: [id, eventId], onDelete: Cascade)
+  track       Track?          @relation(fields: [trackId, eventId], references: [id, eventId])
+  duplicateOf Project?        @relation("Duplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates  Project[]       @relation("Duplicates")
+  assignments Assignment[]
+  reviews     Review[]
+  results     ProjectResult[]
+
+  @@unique([eventId, externalId])
+  @@unique([id, eventId])
+  @@index([eventId, status])
+}
+
+// ── judging ─────────────────────────────────────────────────────────────────
+
+model Criterion {
+  id          String  @id @default(uuid()) @db.Uuid
+  eventId     String  @db.Uuid
+  key         String // stable machine name, e.g. "functionality"
+  label       String
+  description String  @default("")
+  weight      Decimal @default(1) @db.Decimal(6, 3) // relative; applied at compute time, not stored in scores
+  minScore    Int     @default(1)
+  maxScore    Int     @default(5)
+  position    Int     @default(0)
+
+  event  Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  scores ReviewScore[]
+
+  @@unique([eventId, key])
+}
+
+model AssignmentBatch {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventId     String   @db.Uuid
+  name        String
+  algorithm   String // "import" | "manual" | "csv" | "balanced-greedy" ...
+  params      Json     @default("{}")
+  seed        Int? // RNG seed, so an algorithmic batch can be reproduced exactly
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  assignments Assignment[]
+}
+
+model Assignment {
+  id            String           @id @default(uuid()) @db.Uuid
+  eventId       String           @db.Uuid
+  batchId       String?          @db.Uuid
+  judgeId       String           @db.Uuid
+  projectId     String           @db.Uuid
+  status        AssignmentStatus @default(assigned)
+  recusalReason String?
+  createdAt     DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime         @updatedAt @db.Timestamptz(3)
+
+  event   Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  batch   AssignmentBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  judge   User             @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  project Project          @relation(fields: [projectId, eventId], references: [id, eventId], onDelete: Cascade)
+  review  Review?
+
+  @@unique([judgeId, projectId])
+  @@unique([id, judgeId, projectId])
+  @@index([eventId, status])
+}
+
+// A review always belongs to exactly one assignment, and its judge/project must match it.
+model Review {
+  id           String       @id @default(uuid()) @db.Uuid
+  assignmentId String       @unique @db.Uuid
+  eventId      String       @db.Uuid
+  judgeId      String       @db.Uuid
+  projectId    String       @db.Uuid
+  comment      String       @default("")
+  status       ReviewStatus @default(draft)
+  submittedAt  DateTime?    @db.Timestamptz(3)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(3)
+
+  assignment Assignment    @relation(fields: [assignmentId, judgeId, projectId], references: [id, judgeId, projectId], onDelete: Cascade)
+  event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  project    Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scores     ReviewScore[]
+
+  @@unique([assignmentId, judgeId, projectId]) // required by Prisma for the 1:1 composite relation
+  @@index([eventId, judgeId])
+  @@index([projectId])
+}
+
+// Raw per-criterion value. Range and same-event checks are enforced by a trigger.
+model ReviewScore {
+  reviewId    String @db.Uuid
+  criterionId String @db.Uuid
+  value       Int
+
+  review    Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  criterion Criterion @relation(fields: [criterionId], references: [id], onDelete: Restrict)
+
+  @@id([reviewId, criterionId])
+}
+
+model ConflictOfInterest {
+  id        String    @id @default(uuid()) @db.Uuid
+  eventId   String    @db.Uuid
+  judgeId   String    @db.Uuid
+  teamId    String    @db.Uuid
+  source    CoiSource
+  note      String    @default("")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  judge User  @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, judgeId, teamId])
+}
+
+// ── results: immutable snapshots, one per computation ───────────────────────
+
+model NormalizationRun {
+  id             String   @id @default(uuid()) @db.Uuid
+  eventId        String   @db.Uuid
+  method         String
+  params         Json     @default("{}")
+  weights        Json // criterion key -> weight, as used by this run
+  inputHash      String // sha256 of the reviews that went in
+  componentCount Int // connected components of the judge-project graph
+  createdById    String?  @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  event        Event           @relation("EventRuns", fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy    User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  publishedFor Event?          @relation("PublishedRun")
+  results      ProjectResult[]
+  judgeStats   JudgeStat[]
+}
+
+model ProjectResult {
+  runId           String   @db.Uuid
+  projectId       String   @db.Uuid
+  nReviews        Int
+  rawScore        Float
+  normalizedScore Float
+  stdError        Float?
+  rank            Int
+  flags           String[] @default([])
+
+  run     NormalizationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([runId, projectId])
+}
+
+model JudgeStat {
+  runId    String   @db.Uuid
+  judgeId  String   @db.Uuid
+  nReviews Int
+  offset   Float
+  stdDev   Float?
+  flags    String[] @default([])
+
+  run NormalizationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@id([runId, judgeId])
+}
+
+// ── audit: append-only, hash-chained (see migration triggers) ───────────────
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  eventId     String?  @db.Uuid
+  actorUserId String?  @db.Uuid
+  actorLabel  String // "organizer@x.org", "system:seed", "anonymous"
+  action      String // "project.submit", "submission.refused_closed", "rubric.weights_changed", ...
+  entityType  String
+  entityId    String?
+  before      Json?
+  after       Json?
+  ip          String?
+  requestId   String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  prevHash    String
+  hash        String   @unique
+
+  // Restrict: history is never rewritten, so audited events/users are archived, not deleted.
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  actor User?  @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([eventId, createdAt])
+}

@@ -1,0 +1,31 @@
+# .dogfood.toml
+# Put this at the root of your repo. About ten lines.
+# Run the checker with:  python3 run.py .dogfood.toml
+
+[portal]
+# Where your portal is listening after `docker compose up`.
+base_url = "http://localhost:8080"
+
+[tiers]
+# The tiers you believe you finished. Honest claims only.
+claimed = ["T1", "T2"]
+pitch = "One sentence on what you built."
+
+[auth]
+# Whatever header proves you are this role. A cookie, a bearer token,
+# a basic auth string. Your seed script prints these when the portal
+# boots. The checker never logs in, it just attaches these.
+organizer   = "Cookie: session=org_7f2a"
+judge_a     = "Cookie: session=jdg_a_91bc"
+judge_b     = "Cookie: session=jdg_b_44de"
+participant = "Cookie: session=prt_2e88"
+
+[routes]
+# Your routes, whatever you called them.
+gallery      = "/projects"
+submit       = "/projects/new"
+judge_scores = "/api/judge/scores"
+# peer_scores is the url that would return judge_a's scores.
+# The checker visits it as judge_b, who should be refused.
+peer_scores  = "/api/judge/scores?judge=judge_a"
+csv_export   = "/api/export.csv"

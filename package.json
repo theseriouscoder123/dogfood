@@ -1,0 +1,16 @@
+{
+  "name": "dogfood-portal",
+  "private": true,
+  "description": "Self-hostable hackathon submission and judging portal",
+  "license": "MIT",
+  "scripts": {
+    "install:all": "npm --prefix apps/api install && npm --prefix apps/web install",
+    "dev:db": "docker compose up -d db mail",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "db:migrate": "npm --prefix apps/api run db:migrate",
+    "db:reset": "npm --prefix apps/api run db:reset",
+    "test": "npm --prefix apps/api test",
+    "up": "docker compose up --build"
+  }
+}

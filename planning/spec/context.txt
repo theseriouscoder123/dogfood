@@ -1,0 +1,755 @@
+DOGFOOD 2026 · FULL CONTEXT
+Copied from https://dogfoodhack.com/spec
+
+I am taking part in a hackathon called DOGFOOD. Everything below is the
+complete brief: what to build, how it is scored, and the exact files I
+have to produce. Please answer my questions using this, and tell me when
+something is not covered here rather than guessing.
+
+================================================================
+1. THE EVENT
+================================================================
+
+DOGFOOD is a 72 hour online hackathon run by Hackathon Raptors.
+Free to enter. Teams of one to four people. Prize pool 2,500 USD.
+
+Every team builds the same product: an open source, self hostable
+submission and judging platform for hackathons. The organisers intend to
+fork the winning project, self host it, and run their own events on it.
+The team keeps ownership. No assignment, no transfer, no CLA.
+
+Tagline: "Build the platform that will judge you."
+
+The premise: every existing hackathon platform converged on the same
+nine features and stopped. The market leader cannot weight judging
+criteria. Platforms claim score normalization but none document it.
+Community voting is treated as unfixable. No platform publishes a public
+API. This event is an attempt to build what organisers actually need.
+
+================================================================
+2. TIMELINE, ALL TIMES UTC
+================================================================
+
+Thu 24 Sep 2026            Spec published. No project code yet.
+Fri 25 Sep 2026, 18:00     Kickoff. The clock starts. Nothing new is
+                           released, because nothing is held back.
+Mon 28 Sep 2026, 18:00     Code freeze. Submissions due.
+28 Sep to 8 Oct 2026       Judging window.
+Sun 5 Oct 2026, 18:00      Write Up Quest closes.
+Fri 9 Oct 2026             Winners announced, with the adoption decision.
+
+Before kickoff you may plan, read, sketch schemas and form a team.
+You may not write project code before Friday 18:00 UTC.
+
+Every file is published with the spec rather than held to kickoff:
+run.py, fixtures.json, the example configuration, all of it. You can read
+exactly what will be checked and load the exact data before you start.
+run.py's full source is in Appendix A below.
+
+================================================================
+3. THE TIER LADDER
+================================================================
+
+Teams claim the tiers they complete and are judged on that claim.
+T1 is the floor. Clear T1 or you are not scored.
+A clean T2 beats a broken T4. Correctness outranks breadth.
+
+T1 CORE
+  Authentication and sessions
+  A real role model: visitor, participant, judge, organizer, admin
+  Event creation with configurable dates, tracks and prizes
+  Team formation by invite link
+  Project submission with draft and edit until the deadline
+  Deadline enforcement that actually holds
+  Public gallery with search and filter
+
+T2 JUDGING
+  Judge invitation and assignment
+  A weighted scoring rubric the organizer can configure
+  Backend enforced role isolation: judges cannot see peer scores
+  A live organizer progress dashboard
+  Cross judge normalization, with the method documented
+  CSV export
+
+T3 PUBLIC
+  Community voting: email gated, link based or authenticated
+  Project comments
+  Results hidden during the voting window
+  Randomized project ordering on ballots
+  Anti abuse: rate limits, duplicate detection, audit trail
+
+T4 STRETCH
+  REST API and webhooks
+  Certificate and record generation
+  Signed, publicly verifiable judge participation records
+  Embeddable gallery widget
+  Bulk import and export
+
+================================================================
+4. SCORING
+================================================================
+
+Five point scale, weighted average across judges.
+
+  Tier Completion and Correctness   40%
+    How far up the ladder you got, verified by the acceptance report
+    rather than by the README. Correctness beats breadth. Honest gap
+    reporting is rewarded. Inflated claims are penalised.
+
+  Judging Integrity                 25%
+    Role isolation enforced in the backend rather than painted on the
+    frontend. A documented and defensible normalization method. An audit
+    trail an organizer can actually read. Abuse considered up front.
+
+  Adoptability and Operability      20%
+    Could this be run in production on Monday. One command to running,
+    seeded with real data, documentation a stranger can follow, a
+    migration path in and out, a clean license.
+
+  Code Quality and Innovation       15%
+    Idiomatic by the standard of a senior reviewer in that stack. A
+    schema worth defending. Design decisions worth stealing.
+
+================================================================
+5. BONUS CHALLENGES
+================================================================
+
+Four optional challenges. You may attempt all four. The organisers'
+advice is to pick one and do it properly: one done well beats four
+started.
+
+  Normalization Proof   Hard    Implement cross judge normalization on
+                                the fixture data and document the method
+                                rigorously.
+  Pairwise Mode         Hard    A Bradley Terry estimator for pairwise
+                                judging comparison.
+  Threat Model          Medium  A written defence against Sybil votes,
+                                ballot stuffing, collusion and similar.
+  API First             Medium  A documented REST API with an OpenAPI
+                                spec.
+
+IMPORTANT: bonus points do NOT change your score. Your score is the
+weighted average of the four criteria above, on a scale of 0 to 5.
+Bonuses break ties between projects that land on the same number, and
+they decide the Best Judging Engine prize.
+
+================================================================
+6. RULES
+================================================================
+
+  1. Open source under an OSI approved license. MIT or Apache-2.0
+     preferred. You retain ownership.
+  2. Clear T1 or you are not judged.
+  3. New code only, written during the 72 hour window. Frameworks,
+     libraries, boilerplate generators and AI tools are all fine. New
+     code only means you do not arrive with the portal already written.
+  4. No hosted dependencies. It must run offline on a laptop.
+  5. Honest tier claims, declared in .dogfood.toml. Overclaiming is
+     penalised.
+  6. Team size one to four. Solo is welcome.
+  7. Public GitHub repo. Anonymous usernames are accepted as long as the
+     team is reachable.
+  8. AI tools are expected. Claude Code, Cursor, Copilot, all fair game.
+     You are judged on whether it runs and on schema quality, not on
+     whether you used AI.
+  9. Role isolation must be enforced in the backend or API, not just in
+     the UI.
+
+THE ONE COMMAND RULE
+  "If it does not come up on a laptop with the network off, we cannot
+  adopt it, and adoption is the entire point."
+
+  docker compose up must start a fully functional, seeded portal on
+  localhost with zero external dependencies. No cloud accounts, no
+  hosted databases, no external APIs, no authentication as a service.
+
+OUT OF SCOPE, AUTOMATIC DISQUALIFICATION
+  Design mockups or a hardcoded frontend with no backend.
+  Anything requiring cloud accounts or hosted services.
+  Role checks only in the frontend. A curl test must fail for
+    unauthorized access.
+  A gallery with no judging, or judging with no gallery.
+  Closed source, or a non OSI approved license.
+  A rewrite of an existing platform with the features renamed.
+  Anything requiring custom hardware or proprietary tools.
+
+================================================================
+7. WHAT YOU SUBMIT
+================================================================
+
+A public GitHub repo containing:
+
+  .dogfood.toml           tiers claimed, one line pitch, where things are
+  acceptance-report.txt   the output of run.py, tier by tier
+  docker-compose.yml      one command to a seeded, working portal
+  README.md               what it does, how to run, honest limitations
+  ARCHITECTURE.md         system design and rationale
+  DATA-MODEL.md           schema, import and export paths
+  JUDGING.md              assignment strategy, scoring math, the
+                          normalization method, defended
+  LICENSE                 MIT or Apache-2.0 preferred
+  src/                    all code written during the window
+  tests/                  your own test suite, beyond the acceptance one
+
+Plus a five minute demo video showing one full event lifecycle:
+create, submit, judge, publish.
+
+================================================================
+8. .dogfood.toml
+================================================================
+
+About ten lines at the root of your repo. It tells the acceptance
+checker where things are in your portal.
+
+Why it exists: forty teams are building forty different portals. If the
+organisers demanded a fixed set of routes they would be designing your
+API for you. So instead you build whatever you want, call your routes
+whatever you want, and write down where they ended up.
+
+  [portal]
+  base_url = "http://localhost:8080"
+
+  [tiers]
+  claimed = ["T1", "T2"]
+  pitch = "One sentence on what you built."
+
+  [auth]
+  # Whatever header proves you are this role. A cookie, a bearer token,
+  # a basic auth string. Your seed script prints these when the portal
+  # boots. The checker never logs in, it just attaches these.
+  organizer   = "Cookie: session=org_7f2a"
+  judge_a     = "Cookie: session=jdg_a_91bc"
+  judge_b     = "Cookie: session=jdg_b_44de"
+  participant = "Cookie: session=prt_2e88"
+
+  [routes]
+  gallery      = "/projects"
+  submit       = "/projects/new"
+  judge_scores = "/api/judge/scores"
+  peer_scores  = "/api/judge/scores?judge=judge_a"
+  csv_export   = "/api/export.csv"
+
+Notes:
+  The checker never logs in. Logging in is the one thing no two stacks
+  do alike, so you hand over a working header and the checker attaches
+  it. Your login page can work however you want.
+
+  peer_scores is the url that, in your portal, would return judge A's
+  scores. A query parameter, a path like /api/judges/jdg_01/scores,
+  anything. The checker visits it as judge B, who should be refused.
+
+  claimed is on your honour and it is checked. The checker prints what
+  it verified next to what you claimed.
+
+================================================================
+9. fixtures.json
+================================================================
+
+A file of invented hackathon data that every team loads into their
+portal, released at kickoff. Roughly 40 projects, 30 judges, 8 tracks.
+
+Why it exists: if everyone seeds their own demo data, a judge opening
+two portals is comparing test data, not software. Shared fixtures remove
+that. The file also contains awkward cases on purpose: a judge who gave
+every project the same score, two review batches nobody finished, and
+one duplicate submission.
+
+The real file is at https://dogfoodhack.com/spec/fixtures.json
+Here is a three record sample so the shape is readable at a glance:
+
+  {
+    "event": {
+      "id": "evt_01",
+      "name": "Sample Hack 2026",
+      "submissions_close": "2026-03-01T18:00:00Z"
+    },
+    "tracks":   [ { "id": "trk_01", "name": "Developer tools" } ],
+    "judges":   [ { "id": "jdg_01", "name": "Ada Okonkwo",
+                    "email": "ada@example.org", "tracks": ["trk_01"] } ],
+    "teams":    [ { "id": "tm_01", "name": "Nightshift",
+                    "members": ["ada@example.org"] } ],
+    "projects": [ { "id": "prj_01", "team": "tm_01", "track": "trk_01",
+                    "title": "Quiet Hours", "summary": "One line.",
+                    "repo_url": "https://example.org/repo",
+                    "submitted_at": "2026-02-28T22:14:00Z" } ],
+    "scores":   [ { "judge": "jdg_01", "project": "prj_01",
+                    "criteria": { "functionality": 4, "quality": 3 },
+                    "comment": "Text, sometimes empty." } ]
+  }
+
+Every id is a string. Every timestamp is ISO 8601 in UTC. Some score
+entries are missing on purpose, because not every judge finishes every
+batch. Your portal should not fall over when one project has two reviews
+and its neighbour has five.
+
+You do not have to store it in this shape. Load it, transform it, put it
+in whatever schema you can defend. The file is input, not your data
+model.
+
+================================================================
+10. THE ACCEPTANCE CHECKER
+================================================================
+
+One Python file, run.py. Any Python 3, standard library only, nothing to
+install. Keep fixtures.json next to it.
+
+  python3 run.py .dogfood.toml > acceptance-report.txt
+
+It makes seven requests to your running portal and prints a line each.
+
+T1  A stranger can browse the gallery.
+      GET {routes.gallery} with no auth header
+      expect 200
+
+T1  The gallery shows fixture projects.
+      GET {routes.gallery}
+      expect a known fixture project title in the body
+
+T1  A closed event refuses submissions.
+      POST {routes.submit} as participant
+      expect 4xx
+      The fixture event's submissions_close is a date in the past, so if
+      you seeded honestly your portal is already closed and this post
+      has to be refused. The checker does not manipulate a clock and
+      does not inspect why you refused.
+
+T2  A judge can read their own scores.
+      GET {routes.judge_scores} as judge_a
+      expect 200
+
+T2  A judge cannot read a peer's scores.   <-- the important one
+      GET {routes.peer_scores} as judge_b
+      expect 401 or 403
+      Hiding another judge's scores in your template is not refusing.
+      The check has to live in the backend, because the backend is where
+      curl arrives. This is the most common way a good looking project
+      loses points, and it usually takes one if statement to fix.
+
+T2  A participant is not a judge.
+      GET {routes.judge_scores} as participant
+      expect 401 or 403
+
+T2  An organizer can export CSV.
+      GET {routes.csv_export} as organizer
+      expect 200 and a CSV body
+
+That is the whole list.
+
+================================================================
+11. acceptance-report.txt
+================================================================
+
+Whatever run.py printed, redirected to a file and committed. There is
+nothing to write by hand and no format to follow.
+
+  DOGFOOD 2026 acceptance report
+  portal: http://localhost:8080
+  claimed: T1 T2
+  fixtures: fixtures.json
+
+  T1  gallery is public ................. PASS
+  T1  project from fixtures shown ....... PASS
+  T1  closed event refuses submissions .. PASS
+  T2  judge sees own scores ............. PASS
+  T2  judge cannot see peer scores ...... FAIL
+         GET http://localhost:8080/api/judge/scores?judge=judge_a
+         sent as judge_b; this is the url that returns judge_a's scores
+         got 200, wanted 401 or 403
+         the backend returned another judge's scores
+  T2  participant blocked ............... PASS
+  T2  csv export works .................. PASS
+
+  claimed T1 T2, verified T1
+  note: claimed but not verified: T2
+
+Commit the report even when it has failures in it. A report with two
+honest FAIL lines reads better than a README claiming everything works.
+Write the gaps into your README too. The organisers run the same
+checker, so there is no advantage in hiding anything.
+
+================================================================
+12. WHAT IS NOT CHECKED
+================================================================
+
+Your language. Your framework. Your database. Your ORM, or the absence
+of one. Your schema. Your route names. Your CSS, your component library,
+your lack of a component library. Your repo layout. Your commit style.
+Your branch names. Whether you wrote tests and how many. Whether you
+used Claude Code, Cursor, Copilot or none of them. How you split work
+between teammates. Whether you sleep.
+
+Advice from the organisers: pick what you know. A boring stack you are
+fluent in will get further in 72 hours than an exciting one you are
+learning.
+
+================================================================
+13. PRIZES
+================================================================
+
+  1st, Grand Prize        800 USD   the portal that gets forked and run
+  2nd, Runner Up          500 USD
+  3rd                     350 USD
+  4th                     200 USD
+  5th                     150 USD
+  Best Judging Engine     100 USD   most defensible assignment,
+                                    normalization and isolation
+  Write Up Quest          400 USD   4 x 100, closes 5 Oct 18:00 UTC
+
+Write Up Quest: publish a technical write up of your build process on
+any developer focused platform, tagged #DogfoodHackathon. Good topics
+are schema rework, normalization math, role isolation bugs, features you
+cut, designs you abandoned. Judged on insight and substance, not
+follower count.
+
+WHAT HAPPENS TO THE WINNER
+  You keep ownership. No assignment, no CLA.
+  Hackathon Raptors forks it, self hosts it and runs events on it.
+  Your team is credited on every event page it powers, permanently.
+  All fixes and improvements are upstreamed as pull requests.
+  If two entries are close they may adopt one and credit ideas from the
+  other, with public disclosure of what came from where.
+
+================================================================
+14. SUGGESTED STARTING POINTS
+================================================================
+
+  Full stack builders        T1 then T2
+  Backend and API engineers  T2 through T4
+  Frontend and design        T1 then T3
+  Data and algorithms        T2 plus the bonus challenges
+  Security engineers         T2 to T3 plus the Threat Model bonus
+  DevOps and self hosting    T1 with a focus on adoptability
+
+================================================================
+LINKS
+================================================================
+
+  Event site   https://dogfoodhack.com
+  This spec    https://dogfoodhack.com/spec
+  spec.md      https://dogfoodhack.com/spec/spec.md
+  run.py       https://dogfoodhack.com/spec/run.py
+  Example toml https://dogfoodhack.com/spec/example.dogfood.toml
+  Discord      https://discord.gg/xfYPDZYqeh
+
+END OF CONTEXT
+
+================================================================
+APPENDIX A. run.py, THE ACCEPTANCE CHECKER, IN FULL
+================================================================
+
+This is the exact program that produces acceptance-report.txt.
+It is the same program for every team. Judges also read the repo,
+the documentation and the demo video, so this is not the whole of
+the assessment, but nothing about it is hidden.
+
+#!/usr/bin/env python3
+"""DOGFOOD 2026 acceptance checker.
+
+Usage:  python3 run.py .dogfood.toml > acceptance-report.txt
+
+Any Python 3. Standard library only, nothing to install.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+
+try:
+    import tomllib  # Python 3.11 and newer
+except ModuleNotFoundError:
+    tomllib = None
+
+
+def parse_toml(text):
+    """Enough TOML for .dogfood.toml, so older Pythons work too.
+
+    Handles [section] headers, key = "string", and key = ["a", "b"].
+    """
+    data, section = {}, None
+    for raw in text.splitlines():
+        line = raw.split("#")[0].strip()
+        if not line:
+            continue
+        head = re.fullmatch(r"\[([A-Za-z0-9_.]+)\]", line)
+        if head:
+            section = data.setdefault(head.group(1), {})
+            continue
+        key, sep, value = line.partition("=")
+        if not sep or section is None:
+            continue
+        key, value = key.strip(), value.strip()
+        if value.startswith("["):
+            items = re.findall(r'"([^"]*)"', value)
+            section[key] = items
+        else:
+            section[key] = value.strip().strip('"').strip("'")
+    return data
+
+
+def load_config(path):
+    if tomllib:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    with open(path, encoding="utf-8") as f:
+        return parse_toml(f.read())
+
+TIERS = ["T1", "T2", "T3", "T4"]
+TIMEOUT = 10
+
+
+def request(url, header=None, method="GET", body=None):
+    """Return (status, text). Never raises on an HTTP error status."""
+    req = urllib.request.Request(url, method=method)
+    if header:
+        name, _, value = header.partition(":")
+        req.add_header(name.strip(), value.strip())
+    if body is not None:
+        req.data = json.dumps(body).encode()
+        req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            return resp.status, resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode("utf-8", "replace")
+    except Exception as e:
+        return 0, f"{type(e).__name__}: {e}"
+
+
+class Check:
+    """One assertion. Collects its own failure detail as it runs."""
+
+    def __init__(self, tier, label):
+        self.tier = tier
+        self.label = label
+        self.ok = False
+        self.detail = []
+
+    def note(self, line):
+        self.detail.append(line)
+
+
+def build_checks(cfg, fixture):
+    base = cfg["portal"]["base_url"].rstrip("/")
+    auth = cfg.get("auth", {})
+    routes = cfg.get("routes", {})
+
+    def url(key, suffix=""):
+        return base + routes.get(key, "") + suffix
+
+    checks = []
+
+    # --- T1 -------------------------------------------------------------
+    c = Check("T1", "gallery is public")
+    status, body = request(url("gallery"))
+    c.ok = status == 200
+    if not c.ok:
+        c.note(f"GET {url('gallery')}")
+        c.note("no auth header")
+        c.note(f"got {status or 'no response'}, wanted 200")
+    gallery_body = body
+    checks.append(c)
+
+    c = Check("T1", "project from fixtures shown")
+    titles = fixture_titles(fixture)
+    haystack = gallery_body.lower()
+    c.ok = any(t.lower() in haystack for t in titles)
+    if not c.ok:
+        c.note(f"GET {url('gallery')}")
+        if titles:
+            c.note("looked for any of these fixture project titles: "
+                   + ", ".join(repr(t) for t in titles))
+            c.note("none of them appeared in the response body")
+            c.note("if your gallery paginates, make sure page one is what "
+                   "this route returns")
+        else:
+            c.note("no fixture file was loaded, so there was nothing to look for")
+    checks.append(c)
+
+    c = Check("T1", "closed event refuses submissions")
+    status, _ = request(
+        url("submit"),
+        header=auth.get("participant"),
+        method="POST",
+        body={"title": "dogfood-late-submission-probe", "summary": "probe"},
+    )
+    c.ok = 400 <= status < 500
+    if not c.ok:
+        c.note(f"POST {url('submit')}")
+        c.note("sent as participant; the fixture event closed "
+               f"{(fixture or {}).get('event', {}).get('submissions_close', 'in the past')}")
+        c.note(f"got {status or 'no response'}, wanted 4xx")
+    checks.append(c)
+
+    # --- T2 -------------------------------------------------------------
+    c = Check("T2", "judge sees own scores")
+    status, _ = request(url("judge_scores"), header=auth.get("judge_a"))
+    c.ok = status == 200
+    if not c.ok:
+        c.note(f"GET {url('judge_scores')}")
+        c.note("sent as judge_a")
+        c.note(f"got {status or 'no response'}, wanted 200")
+    checks.append(c)
+
+    c = Check("T2", "judge cannot see peer scores")
+    probe = base + routes.get("peer_scores", routes.get("judge_scores", ""))
+    status, _ = request(probe, header=auth.get("judge_b"))
+    c.ok = status in (401, 403)
+    if not c.ok:
+        c.note(f"GET {probe}")
+        c.note("sent as judge_b; this is the url that returns judge_a's scores")
+        c.note(f"got {status or 'no response'}, wanted 401 or 403")
+        if status == 200:
+            c.note("the backend returned another judge's scores")
+    checks.append(c)
+
+    c = Check("T2", "participant blocked")
+    status, _ = request(url("judge_scores"), header=auth.get("participant"))
+    c.ok = status in (401, 403)
+    if not c.ok:
+        c.note(f"GET {url('judge_scores')}")
+        c.note("sent as participant")
+        c.note(f"got {status or 'no response'}, wanted 401 or 403")
+    checks.append(c)
+
+    c = Check("T2", "csv export works")
+    status, body = request(url("csv_export"), header=auth.get("organizer"))
+    first_line = body.splitlines()[0] if body.splitlines() else ""
+    c.ok = status == 200 and "," in first_line
+    if not c.ok:
+        c.note(f"GET {url('csv_export')}")
+        c.note("sent as organizer")
+        if status != 200:
+            c.note(f"got {status or 'no response'}, wanted 200")
+        else:
+            c.note("got 200 but the first line has no comma in it")
+    checks.append(c)
+
+    return checks
+
+
+def fixture_titles(fixture, n=3):
+    projects = (fixture or {}).get("projects") or []
+    return [p.get("title", "") for p in projects[:n] if p.get("title")]
+
+
+def load_fixture(explicit, config_path):
+    """Look where a student would plausibly have put it."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    beside_config = os.path.dirname(os.path.abspath(config_path))
+    candidates = [explicit] if explicit else [
+        "fixtures.json",
+        os.path.join(here, "fixtures.json"),
+        os.path.join(beside_config, "fixtures.json"),
+        os.path.join(beside_config, "data", "fixtures.json"),
+    ]
+    for c in candidates:
+        try:
+            with open(c, "rb") as f:
+                return json.load(f), c
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+    return None, None
+
+
+def main():
+    ap = argparse.ArgumentParser(description="DOGFOOD 2026 acceptance checker")
+    ap.add_argument("config", help="path to .dogfood.toml")
+    ap.add_argument("--fixtures", default=None,
+                    help="path to fixtures.json (searched for if omitted)")
+    args = ap.parse_args()
+
+    cfg = load_config(args.config)
+
+    fixture, fixture_path = load_fixture(args.fixtures, args.config)
+    claimed = [t for t in cfg.get("tiers", {}).get("claimed", []) if t in TIERS]
+
+    print("DOGFOOD 2026 acceptance report")
+    print(f"portal: {cfg['portal']['base_url']}")
+    print(f"claimed: {' '.join(claimed) or 'nothing'}")
+    if fixture is None:
+        print("note: fixtures.json was not found, so the fixture content "
+              "check will fail. Put it next to run.py or pass its path.")
+    else:
+        print(f"fixtures: {fixture_path}")
+    print()
+
+    checks = build_checks(cfg, fixture)
+
+    width = max(len(c.label) for c in checks) + 2
+    for c in checks:
+        dots = "." * (width - len(c.label))
+        print(f"{c.tier}  {c.label} {dots} {'PASS' if c.ok else 'FAIL'}")
+        for line in c.detail:
+            print(f"       {line}")
+
+    verified = [t for t in TIERS
+                if any(c.tier == t for c in checks)
+                and all(c.ok for c in checks if c.tier == t)]
+    # a tier only counts if every tier below it also passed
+    solid = []
+    for t in TIERS:
+        if t in verified:
+            solid.append(t)
+        else:
+            break
+
+    print()
+    print(f"claimed {' '.join(claimed) or 'nothing'}, "
+          f"verified {' '.join(solid) or 'nothing'}")
+
+    overclaim = [t for t in claimed if t not in solid]
+    if overclaim:
+        print(f"note: claimed but not verified: {' '.join(overclaim)}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+================================================================
+APPENDIX B. example.dogfood.toml, IN FULL
+================================================================
+
+# .dogfood.toml
+# Put this at the root of your repo. About ten lines.
+# Run the checker with:  python3 run.py .dogfood.toml
+
+[portal]
+# Where your portal is listening after `docker compose up`.
+base_url = "http://localhost:8080"
+
+[tiers]
+# The tiers you believe you finished. Honest claims only.
+claimed = ["T1", "T2"]
+pitch = "One sentence on what you built."
+
+[auth]
+# Whatever header proves you are this role. A cookie, a bearer token,
+# a basic auth string. Your seed script prints these when the portal
+# boots. The checker never logs in, it just attaches these.
+organizer   = "Cookie: session=org_7f2a"
+judge_a     = "Cookie: session=jdg_a_91bc"
+judge_b     = "Cookie: session=jdg_b_44de"
+participant = "Cookie: session=prt_2e88"
+
+[routes]
+# Your routes, whatever you called them.
+gallery      = "/projects"
+submit       = "/projects/new"
+judge_scores = "/api/judge/scores"
+# peer_scores is the url that would return judge_a's scores.
+# The checker visits it as judge_b, who should be refused.
+peer_scores  = "/api/judge/scores?judge=judge_a"
+csv_export   = "/api/export.csv"
+
+================================================================
+END OF CONTEXT
+================================================================
+
+That is everything: the brief, the checker's source, and the example
+configuration. Please answer using only what is above.
