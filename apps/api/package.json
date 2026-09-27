@@ -11,7 +11,9 @@
     "db:reset": "prisma migrate reset --force --skip-seed && tsx src/seed/run.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "audit:verify": "tsx src/scripts/verify-audit.ts"
+    "audit:verify": "tsx src/scripts/verify-audit.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:all": "vitest run && vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

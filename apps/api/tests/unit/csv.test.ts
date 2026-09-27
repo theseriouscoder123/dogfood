@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { csvCell, toCsv } from "../src/lib/csv";
-import { compositeScore } from "../src/judging/composite";
+import { csvCell, toCsv } from "../../src/lib/csv";
+import { compositeScore } from "../../src/judging/composite";
 
 describe("csv", () => {
   it("quotes commas, quotes and newlines", () => {

@@ -106,6 +106,15 @@ export async function seedShowcase(prisma: PrismaClient, sampleEventId: string, 
         { eventId: e.id, name: "Best first-time hackers", value: "$250", rank: 3 },
       ],
     });
+    await tx.criterion.createMany({
+      data: [
+        { eventId: e.id, key: "functionality", label: "Functionality", description: "Does it work? How complete is it for a hackathon build?", weight: 30, position: 0 },
+        { eventId: e.id, key: "technical_depth", label: "Technical depth", description: "How hard was the engineering, and how well was it done?", weight: 25, position: 1 },
+        { eventId: e.id, key: "innovation", label: "Innovation", description: "Is the idea or approach new?", weight: 20, position: 2 },
+        { eventId: e.id, key: "impact", label: "Impact", description: "Would real people use this?", weight: 15, position: 3 },
+        { eventId: e.id, key: "presentation", label: "Presentation", description: "Can we understand it from the page, demo and README?", weight: 10, position: 4 },
+      ],
+    });
     await tx.submissionQuestion.createMany({
       data: [
         { eventId: e.id, label: "How far did you get?", type: "single_select", options: ["Idea", "Prototype", "Working product"], required: true, position: 0 },

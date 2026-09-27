@@ -129,3 +129,23 @@ export type InvitePreview = {
   team: { name: string; memberCount: number };
   event: { slug: string; name: string; maxTeamSize: number };
 };
+
+export type Criterion = { id: string; key: string; label: string; description: string; weight: number; minScore: number; maxScore: number; position: number };
+export type Rubric = { criteria: Criterion[]; locked: boolean; scoreCount: number };
+
+export type JudgeRow = {
+  id: string;
+  name: string;
+  email: string;
+  externalId: string | null;
+  invitedAt: string;
+  hasAccount: boolean;
+  trackIds: string[];
+  assigned: number;
+  submitted: number;
+  recused: number;
+  conflicts: number;
+};
+
+export type ConflictRow = { id: string; source: "declared" | "detected"; note: string; createdAt: string; judge: { id: string; name: string }; team: { id: string; name: string } };
+export type TeamRow = { id: string; name: string; externalId: string | null; members: Array<{ name: string; email: string }>; projects: Array<{ id: string; title: string; status: string }> };

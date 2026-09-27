@@ -12,7 +12,7 @@ import {
   decideWriteSubmission,
   submissionWindow,
   type EventAccess,
-} from "../src/policy";
+} from "../../src/policy";
 
 const actor = (id: string, isAdmin = false) => ({ id, email: `${id}@x.org`, name: id, isAdmin });
 const access = (a: ReturnType<typeof actor> | null, ...roles: EventRoleType[]): EventAccess => ({ actor: a, roles: new Set(roles) });

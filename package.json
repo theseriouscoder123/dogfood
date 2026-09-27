@@ -11,6 +11,7 @@
     "db:migrate": "npm --prefix apps/api run db:migrate",
     "db:reset": "npm --prefix apps/api run db:reset",
     "test": "npm --prefix apps/api test",
-    "up": "docker compose up --build"
+    "up": "docker compose up --build",
+    "test:integration": "npm --prefix apps/api run test:integration"
   }
 }

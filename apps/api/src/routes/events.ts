@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db";
 import { accessFor, registrationWindow, submissionWindow } from "../policy";
 import { eventBySlug } from "../lib/events";
+import { scoreCount } from "./judgingAdmin";
 
 export const eventsRouter = Router();
 
@@ -50,7 +51,7 @@ function prizeTotal(values: string[]): string | null {
 
 eventsRouter.get("/:slug", async (req, res) => {
   const event = await eventBySlug(req.params.slug);
-  const [tracks, prizes, criteria, questions, access, participantCount, teamCount, projectCount] = await Promise.all([
+  const [tracks, prizes, criteria, questions, access, participantCount, teamCount, projectCount, scores] = await Promise.all([
     prisma.track.findMany({
       where: { eventId: event.id }, orderBy: { name: "asc" },
       select: { id: true, externalId: true, name: true, description: true, _count: { select: { projects: { where: { status: "submitted", duplicateOfId: null } } } } },
@@ -62,6 +63,7 @@ eventsRouter.get("/:slug", async (req, res) => {
     prisma.eventRole.count({ where: { eventId: event.id, role: "participant" } }),
     prisma.team.count({ where: { eventId: event.id } }),
     prisma.project.count({ where: { eventId: event.id, status: "submitted", duplicateOfId: null } }),
+    scoreCount(event.id),
   ]);
   res.json({
     event: {
@@ -77,7 +79,8 @@ eventsRouter.get("/:slug", async (req, res) => {
     stats: { participants: participantCount, teams: teamCount, projects: projectCount, prizeTotal: prizeTotal(prizes.map((p) => p.value)) },
     tracks: tracks.map(({ _count, ...t }) => ({ ...t, projectCount: _count.projects })),
     prizes: prizes.map((p) => ({ id: p.id, trackId: p.trackId, name: p.name, description: p.description, value: p.value, rank: p.rank })),
-    criteria: criteria.map((c) => ({ key: c.key, label: c.label, description: c.description, weight: Number(c.weight), minScore: c.minScore, maxScore: c.maxScore })),
+    rubricLocked: scores > 0,
+    criteria: criteria.map((c) => ({ id: c.id, key: c.key, label: c.label, description: c.description, weight: Number(c.weight), minScore: c.minScore, maxScore: c.maxScore })),
     questions: questions.map((q) => ({ id: q.id, label: q.label, help: q.help, type: q.type, options: q.options, required: q.required, isPublic: q.isPublic, position: q.position })),
     myRoles: [...access.roles],
   });

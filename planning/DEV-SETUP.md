@@ -32,12 +32,13 @@ Run this after each finished feature, not only at the end.
 
 ## Useful
 - `npm run db:reset` (in apps/api): drop, migrate and reseed the dev database
-- `npm test` (in apps/api): unit tests (policy matrix, CSV, composite scoring)
+- `npm test` (in apps/api): unit tests (policy matrix, CSV, composite scoring). Fast, no database.
+- `npm run test:integration` (in apps/api): the real API against a real Postgres. Needs `npm run dev:db` running. Each run creates its own throwaway database (`dogfood_test_<timestamp>`), applies migrations, and drops it afterwards; your dev data is never touched.
 - `npm run audit:verify` (in apps/api): check the audit log hash chain
 - `npx prisma studio` (in apps/api): browse the database
 
 ## House rules for the code
-- **Permissions:** add a `decide*` function in `apps/api/src/policy.ts` plus a row in `tests/policy.test.ts`. Never compare roles inside a route.
+- **Permissions:** add a `decide*` function in `apps/api/src/policy.ts` plus a row in `tests/unit/policy.test.ts`, and an API-level check in `tests/integration/`. Never compare roles inside a route.
 - **Audit:** any write an organizer might care about calls `appendAudit(tx, …)` inside the same transaction.
 - **Schema:** change `prisma/schema.prisma`, then run `npx prisma migrate dev --name <what>`. Rules Prisma can't express go into that migration's SQL as hand-written statements.
 - **Web:** pages are server components calling `api()` from `src/lib/api.ts`. The web app never talks to the database.
