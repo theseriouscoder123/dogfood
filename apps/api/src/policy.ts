@@ -103,13 +103,42 @@ export function decideParticipate(a: EventAccess, window: RegistrationWindow): O
   return "allow";
 }
 
+export type JudgingWindow = "not_open" | "open" | "closed";
+
+/** Judges score from judgingOpensAt (default: the submission deadline) until judgingClosesAt (default: never). */
+export function judgingWindow(
+  event: { submissionsCloseAt: Date; judgingOpensAt: Date | null; judgingClosesAt: Date | null },
+  now: Date = new Date(),
+): JudgingWindow {
+  if (now < (event.judgingOpensAt ?? event.submissionsCloseAt)) return "not_open";
+  if (event.judgingClosesAt && now >= event.judgingClosesAt) return "closed";
+  return "open";
+}
+
+/**
+ * Writing a review: the judge must be assigned (the caller looks the assignment up scoped to
+ * the judge, so "not assigned" never reaches here), the assignment must not be recused, and
+ * judging must be open. Staff have no special power to score on a judge's behalf.
+ */
+export function decideScore(a: EventAccess, window: JudgingWindow, assignment: { status: string }): Outcome {
+  if (!a.actor) return "unauthenticated";
+  if (!a.roles.has("judge")) return "forbidden";
+  if (assignment.status === "recused") return "recused";
+  if (window === "not_open") return "judging_not_open";
+  if (window === "closed") return "judging_closed";
+  return "allow";
+}
+
 export type Outcome =
   | Decision
   | "closed"
   | "not_open"
   | "registration_closed"
   | "registration_not_open"
-  | "judge_conflict";
+  | "judge_conflict"
+  | "judging_not_open"
+  | "judging_closed"
+  | "recused";
 
 const refusals: Record<Exclude<Outcome, "allow">, () => HttpError> = {
   unauthenticated,
@@ -119,6 +148,9 @@ const refusals: Record<Exclude<Outcome, "allow">, () => HttpError> = {
   registration_closed: () => new HttpError(403, "registration_closed", "Registration for this event is closed."),
   registration_not_open: () => new HttpError(403, "registration_not_open", "Registration for this event has not opened yet."),
   judge_conflict: () => new HttpError(403, "judge_conflict", "Judges of this event cannot take part in it as participants."),
+  judging_not_open: () => new HttpError(403, "judging_not_open", "Judging hasn't opened yet."),
+  judging_closed: () => new HttpError(403, "judging_closed", "Judging has closed; reviews can no longer change."),
+  recused: () => new HttpError(409, "recused", "You recused yourself from this project."),
 };
 
 /** Turn a decision into the matching HTTP error. */

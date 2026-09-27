@@ -184,3 +184,41 @@ export type CoverageRow = {
 };
 export type AssignmentsOverview = { submissionsClosed: boolean; hasRubric: boolean; projects: CoverageRow[] };
 export type Batch = { id: string; name: string; algorithm: string; params: Record<string, unknown>; seed: number | null; createdAt: string; createdBy: { name: string } | null; assignments: number };
+
+export type JudgingWindow = "not_open" | "open" | "closed";
+export type JudgeCriterion = { id: string; key: string; label: string; description: string; weight: number; minScore: number; maxScore: number };
+export type JudgeQueue = {
+  event: { slug: string; name: string; judgingOpensAt: string; judgingClosesAt: string | null };
+  judgingWindow: JudgingWindow;
+  criteria: JudgeCriterion[];
+  progress: { total: number; submitted: number; inProgress: number; todo: number; recused: number };
+  assignments: Array<{
+    id: string;
+    status: AssignmentStatus;
+    recusalReason: string | null;
+    lastSavedAt: string | null;
+    submittedAt: string | null;
+    project: { id: string; title: string; tagline: string; thumbnailUrl: string | null; track: string | null; team: string };
+  }>;
+};
+export type JudgeAssignment = {
+  assignment: { id: string; status: AssignmentStatus; recusalReason: string | null };
+  review: { status: "draft" | "submitted"; comment: string; submittedAt: string | null; updatedAt: string; scores: Record<string, number> } | null;
+  project: {
+    id: string;
+    title: string;
+    tagline: string;
+    description: string;
+    repoUrl: string | null;
+    demoUrl: string | null;
+    videoUrl: string | null;
+    thumbnailUrl: string | null;
+    techTags: string[];
+    track: string | null;
+    team: { name: string; members: string[] };
+    answers: Array<{ label: string; type: QuestionType; value: string }>;
+  };
+  criteria: JudgeCriterion[];
+  judgingWindow: JudgingWindow;
+  nav: { position: number; total: number; previousId: string | null; nextId: string | null; nextUnscoredId: string | null };
+};

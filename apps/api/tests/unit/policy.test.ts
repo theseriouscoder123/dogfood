@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import type { EventRoleType } from "@prisma/client";
 import {
+  decideScore,
+  judgingWindow,
   decideCreateEvent,
   decideEditProject,
   decideParticipate,
@@ -137,5 +139,36 @@ describe("events and participation", () => {
     ["judge of the same event", judgeA, "open", "judge_conflict"],
   ] as const)("participate: %s → %s", (_label, a, window, expected) => {
     expect(decideParticipate(a, window)).toBe(expected);
+  });
+});
+
+describe("judging", () => {
+  const event = {
+    submissionsCloseAt: new Date("2026-03-01T18:00:00Z"),
+    judgingOpensAt: new Date("2026-03-02T00:00:00Z"),
+    judgingClosesAt: new Date("2026-03-10T00:00:00Z"),
+  };
+  it("window runs from judgingOpensAt to judgingClosesAt", () => {
+    expect(judgingWindow(event, new Date("2026-03-01T23:59:59Z"))).toBe("not_open");
+    expect(judgingWindow(event, new Date("2026-03-02T00:00:00Z"))).toBe("open");
+    expect(judgingWindow(event, new Date("2026-03-10T00:00:00Z"))).toBe("closed");
+  });
+  it("defaults: opens at the submission deadline, never closes", () => {
+    const e = { ...event, judgingOpensAt: null, judgingClosesAt: null };
+    expect(judgingWindow(e, new Date("2026-03-01T17:59:59Z"))).toBe("not_open");
+    expect(judgingWindow(e, new Date("2026-03-01T18:00:00Z"))).toBe("open");
+    expect(judgingWindow(e, new Date("2030-01-01T00:00:00Z"))).toBe("open");
+  });
+  it.each([
+    ["visitor", visitor, "open", "assigned", "unauthenticated"],
+    ["participant", participant, "open", "assigned", "forbidden"],
+    ["organizer (can't score for a judge)", organizer, "open", "assigned", "forbidden"],
+    ["judge, open", judgeA, "open", "assigned", "allow"],
+    ["judge, in progress", judgeA, "open", "in_progress", "allow"],
+    ["judge, before judging", judgeA, "not_open", "assigned", "judging_not_open"],
+    ["judge, after judging", judgeA, "closed", "submitted", "judging_closed"],
+    ["judge, recused", judgeA, "open", "recused", "recused"],
+  ] as const)("score: %s → %s", (_label, a, window, status, expected) => {
+    expect(decideScore(a, window, { status })).toBe(expected);
   });
 });

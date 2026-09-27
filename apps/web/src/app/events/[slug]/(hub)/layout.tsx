@@ -26,6 +26,7 @@ export default async function EventHubLayout({ children, params }: { children: R
     { href: `${base}/rules`, label: "Rules" },
     { href: `${base}/projects`, label: "Projects", count: stats.projects },
     ...(me.user && (myRoles.includes("participant") || team?.team) ? [{ href: `${base}/team`, label: "My team" }] : []),
+    ...(myRoles.includes("judge") ? [{ href: `${base}/judging`, label: "Judging" }] : []),
     ...(isStaff ? [{ href: `${base}/manage`, label: "Manage" }] : []),
   ];
 

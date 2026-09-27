@@ -20,7 +20,11 @@ export function EventSidebar({ data, me, team }: { data: EventDetail; me: Me; te
 
   let cta: React.ReactNode;
   if (isJudge) {
-    cta = <p className="rounded-xl bg-warn-soft px-3 py-2.5 text-center text-sm font-semibold text-warn">You&apos;re judging this event</p>;
+    cta = (
+      <Link href={`/events/${slug}/judging`} className={buttonClass("primary", "lg", "w-full")}>
+        Open judging dashboard
+      </Link>
+    );
   } else if (!me.user && regOpen) {
     cta = (
       <Link href={`/register?next=/events/${slug}/team`} className={buttonClass("accent", "lg", "w-full")}>

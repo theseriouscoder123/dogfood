@@ -13,6 +13,7 @@ import { invitesRouter, teamsRouter } from "./routes/teams";
 import { filesRouter, uploadsRouter } from "./routes/uploads";
 import { judgingAdminRouter } from "./routes/judgingAdmin";
 import { assignmentsRouter } from "./routes/assignments";
+import { judgeConsoleRouter } from "./routes/judgeConsole";
 
 export function createApp() {
   const app = express();
@@ -42,6 +43,7 @@ export function createApp() {
   app.use("/api/events/:slug/teams", teamsRouter);
   app.use("/api/events/:slug/projects", projectsRouter);
   app.use("/api/events/:slug/judges", judgingRouter);
+  app.use("/api/events/:slug/judging", judgeConsoleRouter);
   app.use("/api/events/:slug/export", exportsRouter);
   app.use("/api/invites", invitesRouter);
   app.use("/api/files", filesRouter);

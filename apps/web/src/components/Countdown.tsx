@@ -8,7 +8,7 @@ function parts(ms: number) {
 }
 
 /** Live ticking countdown. Renders a stable placeholder on the server to avoid hydration mismatches. */
-export function Countdown({ to, compact = false }: { to: string; compact?: boolean }) {
+export function Countdown({ to, compact = false, onDark = false }: { to: string; compact?: boolean; onDark?: boolean }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     setNow(Date.now());
@@ -33,9 +33,9 @@ export function Countdown({ to, compact = false }: { to: string; compact?: boole
   return (
     <div className="grid grid-cols-4 gap-2" role="timer" aria-live="off">
       {cells.map(([v, l]) => (
-        <div key={l} className="rounded-xl bg-surface-2 px-1 py-2 text-center">
-          <div className="font-display text-2xl font-bold tabular-nums text-ink">{now === null ? "--" : String(v).padStart(2, "0")}</div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted">{l}</div>
+        <div key={l} className={`rounded-xl px-1 py-2 text-center ${onDark ? "bg-white/10" : "bg-surface-2"}`}>
+          <div className={`font-display text-2xl font-bold tabular-nums ${onDark ? "text-white" : "text-ink"}`}>{now === null ? "--" : String(v).padStart(2, "0")}</div>
+          <div className={`text-[10px] font-semibold uppercase tracking-wider ${onDark ? "text-white/60" : "text-muted"}`}>{l}</div>
         </div>
       ))}
     </div>

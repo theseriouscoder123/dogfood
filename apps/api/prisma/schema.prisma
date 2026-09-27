@@ -324,6 +324,7 @@ model Assignment {
   projectId     String           @db.Uuid
   status        AssignmentStatus @default(assigned)
   recusalReason String?
+  openedAt      DateTime?        @db.Timestamptz(3) // first time the judge opened it; review speed is an integrity signal
   createdAt     DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime         @updatedAt @db.Timestamptz(3)
 
