@@ -2,6 +2,11 @@
 import { describe, expect, it } from "vitest";
 import type { EventRoleType } from "@prisma/client";
 import {
+  decideCreateEvent,
+  decideEditProject,
+  decideParticipate,
+  decideViewProject,
+  registrationWindow,
   decideOrganize,
   decideReadJudgeScores,
   decideWriteSubmission,
@@ -72,5 +77,65 @@ describe("submission window", () => {
     ["judge who is also a participant, open", judgeWhoIsAlsoParticipant, "open", "allow"],
   ] as const)("%s → %s", (_label, a, window, expected) => {
     expect(decideWriteSubmission(a, window)).toBe(expected);
+  });
+});
+
+describe("editing and viewing projects", () => {
+  it.each([
+    ["visitor", visitor, "open", false, "unauthenticated"],
+    ["team member, open", participant, "open", true, "allow"],
+    ["team member, closed", participant, "closed", true, "closed"],
+    ["participant on another team", participant, "open", false, "forbidden"],
+    ["organizer who is not on the team", organizer, "open", false, "forbidden"],
+  ] as const)("edit: %s → %s", (_label, a, window, member, expected) => {
+    expect(decideEditProject(a, window, member)).toBe(expected);
+  });
+
+  const submitted = { status: "submitted", duplicateOfId: null };
+  const draft = { status: "draft", duplicateOfId: null };
+  const duplicate = { status: "submitted", duplicateOfId: "p0" };
+  it.each([
+    ["visitor sees a submitted project", visitor, submitted, false, "allow"],
+    ["visitor cannot see a draft", visitor, draft, false, "unauthenticated"],
+    ["another participant cannot see a draft", participant, draft, false, "forbidden"],
+    ["team member sees own draft", participant, draft, true, "allow"],
+    ["judge cannot browse drafts", judgeA, draft, false, "forbidden"],
+    ["organizer sees drafts", organizer, draft, false, "allow"],
+    ["visitor cannot see a flagged duplicate", visitor, duplicate, false, "unauthenticated"],
+    ["admin sees a flagged duplicate", admin, duplicate, false, "allow"],
+  ] as const)("view: %s", (_label, a, project, member, expected) => {
+    expect(decideViewProject(a, project, member)).toBe(expected);
+  });
+});
+
+describe("events and participation", () => {
+  it("only admins create events", () => {
+    expect(decideCreateEvent(null)).toBe("unauthenticated");
+    expect(decideCreateEvent(organizer.actor)).toBe("forbidden");
+    expect(decideCreateEvent(admin.actor)).toBe("allow");
+  });
+
+  const event = {
+    registrationOpensAt: new Date("2026-02-01T00:00:00Z"),
+    submissionsOpenAt: new Date("2026-02-26T18:00:00Z"),
+    submissionsCloseAt: new Date("2026-03-01T18:00:00Z"),
+  };
+  it("registration runs from its opening until submissions close", () => {
+    expect(registrationWindow(event, new Date("2026-01-31T23:59:59Z"))).toBe("not_open");
+    expect(registrationWindow(event, new Date("2026-02-10T00:00:00Z"))).toBe("open");
+    expect(registrationWindow(event, new Date("2026-03-01T18:00:00Z"))).toBe("closed");
+  });
+  it("without a registration date, registration opens with submissions", () => {
+    expect(registrationWindow({ ...event, registrationOpensAt: null }, new Date("2026-02-10T00:00:00Z"))).toBe("not_open");
+  });
+
+  it.each([
+    ["visitor", visitor, "open", "unauthenticated"],
+    ["logged-in user, open", access(actor("u9")), "open", "allow"],
+    ["logged-in user, closed", access(actor("u9")), "closed", "registration_closed"],
+    ["logged-in user, not open", access(actor("u9")), "not_open", "registration_not_open"],
+    ["judge of the same event", judgeA, "open", "judge_conflict"],
+  ] as const)("participate: %s → %s", (_label, a, window, expected) => {
+    expect(decideParticipate(a, window)).toBe(expected);
   });
 });

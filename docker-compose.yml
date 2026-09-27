@@ -36,6 +36,9 @@ services:
       SEED_DEMO: "true"
       SMTP_URL: smtp://mail:1025
       PUBLIC_BASE_URL: http://localhost:8080
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -68,3 +71,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

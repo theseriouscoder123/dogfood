@@ -5,7 +5,8 @@ import { hashPassword, verifyPassword } from "../auth/password";
 import { clearSessionCookie, createSession, setSessionCookie, tokenFrom } from "../auth/session";
 import { audit, fromRequest } from "../audit";
 import { HttpError } from "../lib/http";
-import { sha256 } from "../lib/crypto";
+import { randomToken, sha256 } from "../lib/crypto";
+import { absoluteUrl, sendMail } from "../lib/mail";
 
 export const authRouter = Router();
 
@@ -71,4 +72,55 @@ authRouter.get("/me", async (req, res) => {
     select: { role: true, event: { select: { slug: true, name: true } } },
   });
   res.json({ user: req.actor, roles: roles.map((r) => ({ role: r.role, event: r.event })) });
+});
+
+// ── password reset ──────────────────────────────────────────────────────────
+
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+/** Always answers the same way, so it can't be used to discover which emails have accounts. */
+authRouter.post("/forgot", async (req, res) => {
+  const body = z.object({ email }).parse(req.body);
+  const user = await prisma.user.findUnique({ where: { email: body.email } });
+  if (user) {
+    const recent = await prisma.passwordReset.count({ where: { userId: user.id, createdAt: { gt: new Date(Date.now() - RESET_TTL_MS) } } });
+    if (recent < 5) {
+      const token = randomToken();
+      await prisma.passwordReset.create({ data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) } });
+      await sendMail({
+        to: user.email,
+        subject: "Reset your Dogfood password",
+        heading: `Hi ${user.name}, reset your password`,
+        body: [
+          user.passwordHash
+            ? "Someone (hopefully you) asked to reset the password for this account. The link works once and expires in an hour."
+            : "Use this link to set a password and activate your account. The link works once and expires in an hour.",
+          "If you didn't ask for this, you can ignore this email.",
+        ],
+        action: { label: user.passwordHash ? "Reset password" : "Set password", url: absoluteUrl(`/reset/${token}`) },
+      });
+      await audit({ ...fromRequest(req), actorLabel: "anonymous", action: "auth.reset_requested", entityType: "User", entityId: user.id });
+    }
+  }
+  res.json({ ok: true });
+});
+
+authRouter.post("/reset", async (req, res) => {
+  const body = z.object({ token: z.string().min(10).max(200), password: z.string().min(8).max(200) }).parse(req.body);
+  const reset = await prisma.passwordReset.findUnique({ where: { tokenHash: sha256(body.token) }, include: { user: true } });
+  if (!reset || reset.usedAt || reset.expiresAt <= new Date()) {
+    throw new HttpError(400, "invalid_reset", "This reset link is invalid or has expired. Ask for a new one.");
+  }
+  const passwordHash = await hashPassword(body.password);
+  await prisma.$transaction([
+    prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
+    prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
+    // A reset signs out every other device.
+    prisma.session.deleteMany({ where: { userId: reset.userId, seeded: false } }),
+  ]);
+  const { token, expiresAt } = await createSession(reset.userId);
+  setSessionCookie(res, token, expiresAt);
+  const u = reset.user;
+  await audit({ ...fromRequest(req), actor: { id: u.id, email: u.email, name: u.name, isAdmin: u.isAdmin }, action: "auth.password_reset", entityType: "User", entityId: u.id });
+  res.json({ user: { id: u.id, email: u.email, name: u.name, isAdmin: u.isAdmin } });
 });

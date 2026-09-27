@@ -8,6 +8,9 @@ import { eventsRouter } from "./routes/events";
 import { projectsRouter } from "./routes/projects";
 import { judgingRouter } from "./routes/judging";
 import { exportsRouter } from "./routes/exports";
+import { eventAdminRouter } from "./routes/eventAdmin";
+import { invitesRouter, teamsRouter } from "./routes/teams";
+import { filesRouter, uploadsRouter } from "./routes/uploads";
 
 export function createApp() {
   const app = express();
@@ -19,9 +22,11 @@ export function createApp() {
     res.setHeader("X-Request-Id", req.requestId);
     next();
   });
-  app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
   app.use(loadActor);
+  // Uploads read the raw body, so they are mounted before the JSON parser.
+  app.use("/api/uploads", uploadsRouter);
+  app.use(express.json({ limit: "1mb" }));
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
@@ -29,9 +34,13 @@ export function createApp() {
 
   app.use("/api/auth", authRouter);
   app.use("/api/events", eventsRouter);
+  app.use("/api/events", eventAdminRouter);
+  app.use("/api/events/:slug/teams", teamsRouter);
   app.use("/api/events/:slug/projects", projectsRouter);
   app.use("/api/events/:slug/judges", judgingRouter);
   app.use("/api/events/:slug/export", exportsRouter);
+  app.use("/api/invites", invitesRouter);
+  app.use("/api/files", filesRouter);
 
   app.use("/api", apiNotFound);
   app.use(errorHandler);

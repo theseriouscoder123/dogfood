@@ -7,6 +7,7 @@ import { config } from "../config";
 import { hashPassword } from "../auth/password";
 import { sha256 } from "../lib/crypto";
 import { importFixtures } from "./importFixtures";
+import { seedShowcase } from "./showcase";
 
 const DEMO_PASSWORD = "dogfood2026";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "admin@dogfood.local").toLowerCase();
@@ -44,6 +45,8 @@ async function main() {
     update: {},
     create: { eventId: event.id, userId: organizer.id, role: "organizer" },
   });
+
+  if (process.env.SEED_SHOWCASE !== "false") await seedShowcase(prisma, event.id, organizer.id);
 
   if (created && summary) {
     console.log(`imported "${event.name}" (${event.slug}): ${summary.projects} projects, ${summary.judges} judges, ${summary.reviews} reviews, criteria ${summary.criteria.join("/")}`);
