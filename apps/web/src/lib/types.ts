@@ -60,6 +60,7 @@ export type EventDetail = {
     votingWindow: VotingWindow;
     votingMode: VotingMode;
     votesPerVoter: number;
+    votingPublished: boolean;
   };
   stats: { participants: number; teams: number; projects: number; prizeTotal: string | null };
   tracks: Track[];
@@ -288,7 +289,7 @@ export type RedistributePreview = {
   moves: Array<{ projectId: string; title: string; judgeId: string; judge: string; loadAfter: number }>;
   unplaced: Array<{ projectId: string; title: string; have: number; need: number; reason: string }>;
 };
-export type ExportItem = { file: string; title: string; stage: string; description: string; rows: number; columns: number; url: string };
+export type ExportItem = { file: string; title: string; stage: string; description: string; rows: number | null; columns: number | null; unavailable: string | null; url: string };
 
 export type RunOptions = { lambdaJudge: number; lambdaProject: number; minReviews: number; excludedJudges: Array<{ judgeId: string; reason: string }> };
 export type RunSummary = {
@@ -505,3 +506,40 @@ export type ModerationItem = {
   totalReports: number;
 };
 export type ModerationQueue = { mode: CommentsMode; counts: { reported: number; hidden: number; total: number }; items: ModerationItem[] };
+
+export type VoteRankingRow = {
+  rank: number;
+  votes: number;
+  share: number;
+  project: { id: string; title: string; tagline: string; thumbnailUrl: string | null; team: string; members: string[]; track: { id: string; name: string } | null };
+};
+export type PositionCheck = {
+  picks: number;
+  buckets: Array<{ label: string; observed: number; expected: number }>;
+  chi2: number;
+  df: number;
+  critical: number | null;
+  enoughData: boolean;
+  positionEffect: boolean;
+};
+export type VoteStats = { voters: number; votes: number; quarantinedBallots: number };
+export type PublicVotingResults = {
+  event: { slug: string; name: string };
+  publishedAt: string;
+  closedAt: string | null;
+  votesPerVoter: number;
+  method: string;
+  stats: VoteStats;
+  ranking: VoteRankingRow[];
+  positionCheck: PositionCheck;
+  ballotFile: { url: string; sha256: string; matches: boolean; ballots: number };
+};
+export type VotingResultsPreview = {
+  published: boolean;
+  publishedAt: string | null;
+  ballotsHash: string;
+  method: string;
+  stats: VoteStats;
+  ranking: VoteRankingRow[];
+  positionCheck: PositionCheck;
+};

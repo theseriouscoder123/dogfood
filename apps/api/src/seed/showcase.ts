@@ -5,6 +5,10 @@
 import type { PrismaClient } from "@prisma/client";
 import { appendAudit } from "../audit";
 import { normalizeOptions, persistRun } from "../judging/results";
+import { rng } from "../judging/assign";
+import { ballotOrder, makeReceipt, normalizeEmail } from "../voting/core";
+import { ballotFile, VOTE_METHOD } from "../voting/tally";
+import { DEMO_VOTER_EMAIL } from "./judgingDemo";
 
 const DAY = 86_400_000;
 
@@ -83,6 +87,11 @@ export async function seedShowcase(prisma: PrismaClient, sampleEventId: string, 
     );
   }
 
+  // A finished People's Choice vote on the fixture event, published, so the public results page,
+  // the downloadable ballot file and receipt checks all have something real to show. About 90
+  // ordinary voters over four days, plus 4 throwaway ballots an organizer already quarantined.
+  if (!sample.votingOpensAt) await seedSampleVote(prisma, sample.id, sample.slug, sample.submissionsCloseAt);
+
   if (await prisma.event.findUnique({ where: { slug: "dogfood-demo-jam" } })) return;
   const now = Date.now();
   const at = (days: number) => new Date(Math.floor((now + days * DAY) / 3_600_000) * 3_600_000);
@@ -138,4 +147,64 @@ export async function seedShowcase(prisma: PrismaClient, sampleEventId: string, 
     });
     await appendAudit(tx, { eventId: e.id, actorLabel: "system:seed", action: "event.create", entityType: "Event", entityId: e.id, after: { slug: e.slug, demo: true } });
   });
+}
+
+async function seedSampleVote(prisma: PrismaClient, eventId: string, slug: string, submissionsCloseAt: Date) {
+  const opens = submissionsCloseAt;
+  const closes = new Date(opens.getTime() + 4 * DAY);
+  const random = rng(20260301);
+  const projects = await prisma.project.findMany({ where: { eventId, status: "submitted", duplicateOfId: null }, select: { id: true, title: true }, orderBy: { id: "asc" } });
+  const ids = projects.map((p) => p.id);
+  // Some projects simply catch the crowd's eye; appeal is fixed per project, taste varies per voter.
+  const appeal = new Map(projects.map((p) => [p.id, random() ** 2]));
+  const FIRST = ["alex", "bea", "cyrus", "dana", "emil", "freya", "gil", "hana", "ivo", "june", "kai", "lior", "mona", "nils", "odette", "pia", "quinn", "rosa"];
+  const LAST = ["abbott", "brandt", "castro", "dahl", "ekstrom", "faure", "grant", "holm", "ito", "juarez", "kowal"];
+  const DOMAINS = ["gmail.com", "outlook.com", "proton.me", "fastmail.com", "yahoo.com"];
+
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.event.update({ where: { id: eventId }, data: { votingOpensAt: opens, votingClosesAt: closes, votingMode: "email", votesPerVoter: 3 } });
+      const cast = async (email: string, name: string, accountAt: Date, at: Date, ip: string, picks: string[], counted: boolean) => {
+        const user = await tx.user.upsert({ where: { email }, update: {}, create: { email, name, emailVerifiedAt: accountAt, createdAt: accountAt } });
+        const identityKey = `user:${user.id}`;
+        const order = ballotOrder(ids, `${eventId}:${identityKey}`);
+        const voter = await tx.voter.create({ data: { eventId, kind: "email", userId: user.id, identityKey, emailKey: normalizeEmail(email), ip, createdAt: at } });
+        const ballot = await tx.ballot.create({
+          data: { eventId, voterId: voter.id, receipt: makeReceipt(), ip, createdAt: at, updatedAt: at, status: counted ? "counted" : "quarantined", quarantineReason: counted ? null : "Four accounts created a minute before voting, one network, identical picks" },
+        });
+        await tx.ballotChoice.createMany({ data: picks.map((projectId) => ({ ballotId: ballot.id, projectId, position: order.indexOf(projectId), createdAt: at })) });
+        await tx.projectView.createMany({ data: picks.map((projectId) => ({ eventId, projectId, viewerKey: identityKey, firstViewedAt: new Date(at.getTime() - 4 * 60_000) })), skipDuplicates: true });
+      };
+      let n = 0;
+      for (const first of FIRST)
+        for (const last of LAST) {
+          if (random() > 0.45) continue;
+          const taste = [...ids].map((id) => ({ id, w: appeal.get(id)! + random() * 0.9 })).sort((a, b) => b.w - a.w);
+          const picks = taste.slice(0, 1 + Math.floor(random() * 3)).map((x) => x.id);
+          const at = new Date(opens.getTime() + random() * 4 * DAY);
+          await cast(`${first}.${last}@${DOMAINS[n % DOMAINS.length]}`, `${first[0]!.toUpperCase()}${first.slice(1)} ${last[0]!.toUpperCase()}${last.slice(1)}`, new Date(opens.getTime() - (30 + random() * 300) * DAY), at, `100.72.${n}.${10 + (n % 200)}`, picks, true);
+          n++;
+        }
+      // The demo voter (voter@dogfood.local, Cookie: sid=seed-voter) voted too, so the receipt check
+      // can be shown end to end: open the closed ballot, copy the receipt, look it up.
+      const favourites = [...ids].sort((a, b) => appeal.get(b)! - appeal.get(a)!).slice(0, 2);
+      await cast(DEMO_VOTER_EMAIL, "Riley Voter", new Date(opens.getTime() - 60 * DAY), new Date(opens.getTime() + 1.2 * DAY), "100.72.250.9", favourites, true);
+
+      const target = ids[Math.floor(random() * ids.length)]!;
+      const ringAt = opens.getTime() + 2.5 * DAY;
+      for (let i = 0; i < 4; i++)
+        await cast(`promo.bot${i + 1}@outlook.com`, `Promo ${i + 1}`, new Date(ringAt + i * 30_000 - 60_000), new Date(ringAt + i * 30_000), `198.51.100.${20 + i}`, [target], false);
+
+      // Publish exactly as the organizer's button does: fingerprint the anonymous ballot file.
+      const ballots = await tx.ballot.findMany({ where: { eventId }, select: { receipt: true, status: true, choices: { select: { projectId: true, position: true } } } });
+      const file = ballotFile(
+        ballots.map((b) => ({ receipt: b.receipt, counted: b.status === "counted", choices: b.choices })),
+        projects,
+        { event: slug, method: VOTE_METHOD },
+      );
+      await tx.event.update({ where: { id: eventId }, data: { votingPublishedAt: closes, votingBallotsHash: file.sha256 } });
+      await appendAudit(tx, { eventId, actorLabel: "system:seed", action: "voting.results_published", entityType: "Event", entityId: eventId, after: { ballotsHash: file.sha256, ballots: file.body.ballots.length } });
+    },
+    { timeout: 120_000 },
+  );
 }

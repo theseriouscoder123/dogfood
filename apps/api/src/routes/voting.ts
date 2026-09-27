@@ -26,6 +26,7 @@ import { randomToken, sha256 } from "../lib/crypto";
 import { ballotOrder, canonicalCode, emailDomainAllowed, makeInviteCode, makeReceipt, normalizeEmail } from "../voting/core";
 import { isDisposableEmail } from "../voting/disposable";
 import { detectSignals, groupIncidents, subnetOf, type AbuseBallot } from "../voting/abuse";
+import { ballotFile, positionCheck, receiptHash, tally, VOTE_METHOD, type TallyBallot } from "../voting/tally";
 
 export const votingRouter = Router({ mergeParams: true });
 
@@ -462,6 +463,7 @@ const Ids = z.array(z.uuid()).min(1).max(2000);
 
 votingRouter.post("/voting/review/quarantine", async (req, res) => {
   const event = await staffEvent(req);
+  if (event.votingPublishedAt) throw new HttpError(409, "results_published", "People's Choice results are published. Unpublish them first, so the public ballot file doesn't change under anyone.");
   const body = z
     .object({ ballotIds: Ids, reason: z.string().trim().min(5, "Say why (at least 5 characters).").max(500), incidentKey: z.string().max(300).optional() })
     .parse(req.body);
@@ -478,6 +480,7 @@ votingRouter.post("/voting/review/quarantine", async (req, res) => {
 
 votingRouter.post("/voting/review/restore", async (req, res) => {
   const event = await staffEvent(req);
+  if (event.votingPublishedAt) throw new HttpError(409, "results_published", "People's Choice results are published. Unpublish them first, so the public ballot file doesn't change under anyone.");
   const body = z.object({ ballotIds: Ids, reason: z.string().trim().min(5, "Say why (at least 5 characters).").max(500) }).parse(req.body);
   const result = await prisma.$transaction(async (tx) => {
     const r = await tx.ballot.updateMany({ where: { eventId: event.id, id: { in: body.ballotIds }, status: "quarantined" }, data: { status: "counted", quarantineReason: null } });
@@ -514,4 +517,140 @@ votingRouter.post("/voting/review/resolve", async (req, res) => {
     await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "vote_incident.dismissed", entityType: "VoteIncident", entityId: body.incidentKey, after: { note: body.note } });
   });
   res.json({ resolution: { status: "dismissed", note: body.note } });
+});
+
+// ── People's Choice results ─────────────────────────────────────────────────
+//
+//   GET  /voting/results/preview     organizer, only once voting has closed
+//   POST /voting/results/publish     fixes the ballot file's SHA-256 and makes results public
+//   POST /voting/results/unpublish
+//   GET  /voting/results             public, once published
+//   GET  /voting/ballots.json        public, once published: every ballot, anonymous, recountable
+//   POST /voting/receipt             public, once published: "was my ballot counted?"
+//
+// While results are published, quarantine decisions are locked, so the public file can't change
+// under anyone's feet. Unpublish first to revise, which is itself audited.
+
+
+async function votingData(eventId: string) {
+  const [ballots, projects] = await Promise.all([
+    prisma.ballot.findMany({ where: { eventId }, select: { receipt: true, status: true, choices: { select: { projectId: true, position: true } } } }),
+    prisma.project.findMany({
+      where: { eventId, status: "submitted", duplicateOfId: null },
+      select: { id: true, title: true, tagline: true, thumbnailUrl: true, team: { select: { name: true, members: { select: { user: { select: { name: true } } } } } }, track: { select: { id: true, name: true } } },
+    }),
+  ]);
+  const tb: TallyBallot[] = ballots.map((b) => ({ receipt: b.receipt, counted: b.status === "counted", choices: b.choices }));
+  const result = tally(tb, projects.map((p) => p.id));
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  return {
+    tb,
+    projects,
+    // Within a tie, alphabetical by title: any order is arbitrary, and this one is easy to scan.
+    ranking: [...result.rows].sort((a, b) => a.rank - b.rank || byId.get(a.projectId)!.title.localeCompare(byId.get(b.projectId)!.title)).map((r) => {
+      const p = byId.get(r.projectId)!;
+      return {
+        rank: r.rank, votes: r.votes, share: Math.round(r.share * 1000) / 1000,
+        project: { id: p.id, title: p.title, tagline: p.tagline, thumbnailUrl: p.thumbnailUrl, team: p.team.name, members: p.team.members.map((m) => m.user.name), track: p.track },
+      };
+    }),
+    stats: {
+      voters: result.voters,
+      votes: result.votes,
+      quarantinedBallots: tb.filter((b) => !b.counted && b.choices.length > 0).length,
+    },
+    positionCheck: positionCheck(tb, projects.length),
+  };
+}
+
+const fileFor = (event: Event, d: Awaited<ReturnType<typeof votingData>>) =>
+  ballotFile(d.tb, d.projects.map((p) => ({ id: p.id, title: p.title })), { event: event.slug, method: VOTE_METHOD });
+
+function requireVotingClosed(event: Event) {
+  const w = votingWindow(event);
+  if (w === "off") enforce("voting_off");
+  if (w !== "closed") throw new HttpError(409, "sealed", "The count stays sealed until voting closes, for organizers too.");
+}
+
+votingRouter.get("/voting/results/preview", async (req, res) => {
+  const event = await staffEvent(req);
+  requireVotingClosed(event);
+  const d = await votingData(event.id);
+  const file = fileFor(event, d);
+  res.json({
+    published: event.votingPublishedAt !== null,
+    publishedAt: event.votingPublishedAt,
+    ballotsHash: file.sha256,
+    method: VOTE_METHOD,
+    stats: d.stats,
+    ranking: d.ranking,
+    positionCheck: d.positionCheck,
+  });
+});
+
+votingRouter.post("/voting/results/publish", async (req, res) => {
+  const event = await staffEvent(req);
+  requireVotingClosed(event);
+  const d = await votingData(event.id);
+  const file = fileFor(event, d);
+  await prisma.$transaction(async (tx) => {
+    await tx.event.update({ where: { id: event.id }, data: { votingPublishedAt: new Date(), votingBallotsHash: file.sha256 } });
+    await appendAudit(tx, {
+      ...fromRequest(req), eventId: event.id, action: "voting.results_published", entityType: "Event", entityId: event.id,
+      after: { ballotsHash: file.sha256, ballots: file.body.ballots.length, top: d.ranking.slice(0, 3).map((r) => ({ projectId: r.project.id, votes: r.votes })) },
+    });
+  });
+  res.json({ published: true, ballotsHash: file.sha256 });
+});
+
+votingRouter.post("/voting/results/unpublish", async (req, res) => {
+  const event = await staffEvent(req);
+  if (!event.votingPublishedAt) throw new HttpError(409, "not_published", "People's Choice results aren't published.");
+  await prisma.$transaction(async (tx) => {
+    await tx.event.update({ where: { id: event.id }, data: { votingPublishedAt: null, votingBallotsHash: null } });
+    await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "voting.results_unpublished", entityType: "Event", entityId: event.id, before: { ballotsHash: event.votingBallotsHash } });
+  });
+  res.json({ published: false });
+});
+
+async function publishedEvent(req: Request) {
+  const event = await eventBySlug((req.params as { slug?: string }).slug);
+  if (!event.votingPublishedAt) throw new HttpError(404, "results_not_published", "People's Choice results haven't been published yet.");
+  return event;
+}
+
+votingRouter.get("/voting/results", async (req, res) => {
+  const event = await publishedEvent(req);
+  const d = await votingData(event.id);
+  const file = fileFor(event, d);
+  res.json({
+    event: { slug: event.slug, name: event.name },
+    publishedAt: event.votingPublishedAt,
+    closedAt: event.votingClosesAt,
+    votesPerVoter: event.votesPerVoter,
+    method: VOTE_METHOD,
+    stats: d.stats,
+    ranking: d.ranking,
+    positionCheck: d.positionCheck,
+    ballotFile: { url: `/api/events/${event.slug}/voting/ballots.json`, sha256: event.votingBallotsHash, matches: file.sha256 === event.votingBallotsHash, ballots: file.body.ballots.length },
+  });
+});
+
+votingRouter.get("/voting/ballots.json", async (req, res) => {
+  const event = await publishedEvent(req);
+  const file = fileFor(event, await votingData(event.id));
+  res.setHeader("Content-Disposition", `attachment; filename="${event.slug}-ballots.json"`);
+  res.setHeader("X-Content-SHA256", file.sha256);
+  res.json({ sha256: file.sha256, ...file.body });
+});
+
+votingRouter.post("/voting/receipt", async (req, res) => {
+  const event = await publishedEvent(req);
+  // In the body, not the URL, so receipts don't end up in logs or browser history.
+  const { receipt } = z.object({ receipt: z.string().trim().min(6).max(40) }).parse(req.body);
+  const file = fileFor(event, await votingData(event.id));
+  const hash = receiptHash(receipt);
+  const found = file.body.ballots.find((b) => b.receiptHash === hash);
+  const title = new Map(file.body.projects.map((p) => [p.id, p.title]));
+  res.json(found ? { found: true, receiptHash: hash, status: found.status, picks: found.picks.map((p) => title.get(p.projectId) ?? "a withdrawn project").sort((a, b) => a.localeCompare(b)) } : { found: false, receiptHash: hash });
 });

@@ -359,7 +359,8 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
       // A verified voter who hasn't voted yet, for trying the ballot live (Cookie: sid=seed-voter).
       await tx.user.upsert({
         where: { email: DEMO_VOTER_EMAIL },
-        update: {},
+        // The showcase seed may have created this voter first (for the sample event's vote).
+        update: { passwordHash: demoPasswordHash, emailVerifiedAt: judgingOpens },
         create: { email: DEMO_VOTER_EMAIL, name: "Riley Voter", emailVerifiedAt: judgingOpens, passwordHash: demoPasswordHash },
       });
 

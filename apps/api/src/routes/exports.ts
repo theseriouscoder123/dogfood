@@ -11,11 +11,13 @@ import { prisma } from "../db";
 import { accessFor, decideOrganize, enforce } from "../policy";
 import { appendAudit, fromRequest } from "../audit";
 import { eventBySlug } from "../lib/events";
-import { notFound } from "../lib/http";
+import { HttpError, notFound } from "../lib/http";
 import { toCsv } from "../lib/csv";
 import { compositeScore, type CriterionSpec } from "../judging/composite";
 import { computeResults, loadResultInputs, normalizeOptions } from "../judging/results";
 import { reviewTarget } from "./progress";
+import { votingWindow } from "../policy";
+import { receiptHash } from "../voting/tally";
 
 export const exportsRouter = Router({ mergeParams: true });
 
@@ -278,6 +280,24 @@ const EXPORTS: ExportDef[] = [
     },
   },
   {
+    file: "ballots.csv",
+    title: "Ballots",
+    stage: "Community",
+    description: "Every community ballot, anonymous (receipt hash, picks, where each was shown). Sealed until voting closes.",
+    async build(event) {
+      if (votingWindow(event) !== "closed") throw new HttpError(409, "sealed", "Ballots stay sealed until voting closes, for organizers too.");
+      const ballots = await prisma.ballot.findMany({
+        where: { eventId: event.id, choices: { some: {} } },
+        select: { receipt: true, status: true, quarantineReason: true, choices: { select: { position: true, project: { select: { id: true, title: true } } } } },
+      });
+      const rows = ballots
+        .map((b) => ({ hash: receiptHash(b.receipt), b }))
+        .sort((x, y) => x.hash.localeCompare(y.hash))
+        .flatMap(({ hash, b }) => b.choices.map((c) => [hash, b.status, b.quarantineReason, c.project.id, c.project.title, c.position + 1]));
+      return { header: ["receipt_hash", "status", "quarantine_reason", "project_id", "project", "shown_at_position"], rows };
+    },
+  },
+  {
     file: "audit.csv",
     title: "Audit log",
     stage: "Record",
@@ -305,13 +325,19 @@ async function staffEvent(req: Request) {
 
 exportsRouter.get("/", async (req, res) => {
   const event = await staffEvent(req);
-  const tables = await Promise.all(EXPORTS.map((x) => x.build(event)));
+  // A file that isn't available yet (sealed ballots) is listed with the reason instead of a count.
+  const tables = await Promise.all(EXPORTS.map((x) => x.build(event).catch((err: unknown) => (err instanceof HttpError ? err : Promise.reject(err)))));
   res.json({
-    exports: EXPORTS.map((x, i) => ({
-      file: x.file, title: x.title, stage: x.stage, description: x.description,
-      rows: tables[i]!.rows.length, columns: tables[i]!.header.length,
-      url: `/api/events/${event.slug}/export/${x.file}`,
-    })),
+    exports: EXPORTS.map((x, i) => {
+      const t = tables[i]!;
+      return {
+        file: x.file, title: x.title, stage: x.stage, description: x.description,
+        rows: t instanceof HttpError ? null : t.rows.length,
+        columns: t instanceof HttpError ? null : t.header.length,
+        unavailable: t instanceof HttpError ? t.message : null,
+        url: `/api/events/${event.slug}/export/${x.file}`,
+      };
+    }),
   });
 });
 

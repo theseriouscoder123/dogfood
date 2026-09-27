@@ -11,12 +11,18 @@ import { Countdown } from "@/components/Countdown";
 import { Button, buttonClass, ErrorText, inputClass } from "@/components/ui";
 import { AvatarStack, Cover } from "@/components/visuals";
 
-export function VoteClient({ slug, data, loggedInEmail, code }: { slug: string; data: VoteView; loggedInEmail: string | null; code: string | null }) {
+export function VoteClient({ slug, data, loggedInEmail, code, published }: { slug: string; data: VoteView; loggedInEmail: string | null; code: string | null; published: boolean }) {
   const canVote = data.status === "allow";
   const showBallot = canVote || (data.status === "closed" && data.ballot !== null);
   return (
     <div className="space-y-6">
-      <Header data={data} />
+      <Header data={data} published={published} />
+      {published && (
+        <Link href={`/events/${slug}/peoples-choice`} className="flex items-center justify-between gap-3 rounded-2xl border border-accent/40 bg-accent-soft px-5 py-4 text-sm font-semibold text-ink hover:border-accent">
+          <span>The People&apos;s Choice results are out. See who won, check your receipt, or recount every ballot yourself.</span>
+          <span className="shrink-0 text-accent">View results →</span>
+        </Link>
+      )}
       {showBallot ? (
         <Ballot slug={slug} data={data} readOnly={!canVote} />
       ) : (
@@ -26,7 +32,7 @@ export function VoteClient({ slug, data, loggedInEmail, code }: { slug: string; 
   );
 }
 
-function Header({ data }: { data: VoteView }) {
+function Header({ data, published }: { data: VoteView; published: boolean }) {
   return (
     <section className="relative overflow-hidden rounded-3xl bg-hero p-6 text-hero-ink sm:p-8">
       <div className="hero-grid absolute inset-0" />
@@ -56,7 +62,8 @@ function Header({ data }: { data: VoteView }) {
             </>
           ) : (
             <p className="flex items-center gap-2 text-sm font-semibold">
-              <Lock className="size-4" /> Voting closed {data.closesAt && formatDate(data.closesAt)}. Results are published after the organizers review the ballots.
+              <Lock className="size-4" /> Voting closed {data.closesAt && formatDate(data.closesAt)}.
+              {published ? " The results are out." : " Results are published after the organizers review the ballots."}
             </p>
           )}
           <p className="mt-4 flex items-start gap-2 text-xs text-white/60">

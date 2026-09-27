@@ -1,12 +1,14 @@
 import { api } from "@/lib/api";
-import type { VotingAdmin } from "@/lib/types";
+import type { VotingAdmin, VotingResultsPreview } from "@/lib/types";
 import { VotingManager } from "./VotingManager";
+import { VotingResults } from "./VotingResults";
 
 export const metadata = { title: "Community voting" };
 
 export default async function VotingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const data = await api<VotingAdmin>(`/api/events/${encodeURIComponent(slug)}/voting/admin`);
+  const preview = data.window === "closed" ? await api<VotingResultsPreview>(`/api/events/${encodeURIComponent(slug)}/voting/results/preview`).catch(() => null) : null;
   return (
     <div className="space-y-6">
       <div>
@@ -16,6 +18,7 @@ export default async function VotingPage({ params }: { params: Promise<{ slug: s
           sealed until voting closes, for you too.
         </p>
       </div>
+      <VotingResults slug={slug} window={data.window} preview={preview} />
       <VotingManager slug={slug} data={data} />
     </div>
   );

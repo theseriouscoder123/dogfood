@@ -39,11 +39,13 @@ export default async function ExportsPage({ params }: { params: Promise<{ slug: 
                   <p className="mt-3 flex-1 text-sm text-ink-2">{x.description}</p>
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold text-muted">
-                      {x.rows.toLocaleString()} row{x.rows === 1 ? "" : "s"} · {x.columns} columns
+                      {x.rows === null ? x.unavailable : `${x.rows.toLocaleString()} row${x.rows === 1 ? "" : "s"} · ${x.columns} columns`}
                     </span>
-                    <a href={x.url} download className={buttonClass("secondary", "sm")}>
-                      <Download className="size-4" /> Download
-                    </a>
+                    {x.rows !== null && (
+                      <a href={x.url} download className={buttonClass("secondary", "sm")}>
+                        <Download className="size-4" /> Download
+                      </a>
+                    )}
                   </div>
                 </div>
               ))}

@@ -153,6 +153,8 @@ model Event {
   votesPerVoter       Int          @default(3) // each voter picks up to this many projects
   voterDomains        String[]     @default([]) // allowed email domains; empty = anyone
   commentsMode        CommentsMode @default(open)
+  votingPublishedAt   DateTime?    @db.Timestamptz(3) // People's Choice results made public
+  votingBallotsHash   String? // SHA-256 of the published ballot file, fixed at publish time
   publishedRunId      String?      @unique @db.Uuid // null = results hidden
   createdAt           DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime     @updatedAt @db.Timestamptz(3)

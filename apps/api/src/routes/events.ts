@@ -80,6 +80,7 @@ eventsRouter.get("/:slug", async (req, res) => {
       votingWindow: votingWindow(event),
       votingMode: event.votingMode,
       votesPerVoter: event.votesPerVoter,
+      votingPublished: event.votingPublishedAt !== null,
     },
     stats: { participants: participantCount, teams: teamCount, projects: projectCount, prizeTotal: prizeTotal(prizes.map((p) => p.value)) },
     tracks: tracks.map(({ _count, ...t }) => ({ ...t, projectCount: _count.projects })),

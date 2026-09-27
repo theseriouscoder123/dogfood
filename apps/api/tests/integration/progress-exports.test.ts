@@ -157,7 +157,7 @@ describe("redistribution", () => {
 });
 
 describe("CSV exports", () => {
-  const FILES = ["participants.csv", "teams.csv", "projects.csv", "judges.csv", "assignments.csv", "reviews.csv", "results.csv", "comments.csv", "audit.csv"];
+  const FILES = ["participants.csv", "teams.csv", "projects.csv", "judges.csv", "assignments.csv", "reviews.csv", "results.csv", "comments.csv", "ballots.csv", "audit.csv"];
 
   it("lists every stage with row counts, and each file downloads as CSV", async () => {
     const s = await setup();
@@ -167,7 +167,12 @@ describe("CSV exports", () => {
     const rows = Object.fromEntries(index.body.exports.map((x: { file: string; rows: number }) => [x.file, x.rows]));
     expect(rows).toMatchObject({ "participants.csv": 5, "teams.csv": 5, "projects.csv": 5, "judges.csv": 4, "assignments.csv": 7, "reviews.csv": 3, "results.csv": 5 });
 
-    for (const file of FILES) {
+    // Ballots stay sealed until voting closes (this event has no vote at all).
+    expect(index.body.exports.find((x: { file: string }) => x.file === "ballots.csv")).toMatchObject({ rows: null, unavailable: expect.stringMatching(/sealed/) });
+    expect((await api().get(`${s.base}/export/ballots.csv`).set("Cookie", s.organizer.cookie)).body.error.code).toBe("sealed");
+    const downloadable = FILES.filter((f) => f !== "ballots.csv");
+
+    for (const file of downloadable) {
       const res = await api().get(`${s.base}/export/${file}`).set("Cookie", s.organizer.cookie);
       expect(res.status, file).toBe(200);
       expect(res.headers["content-type"]).toMatch(/^text\/csv/);
@@ -176,7 +181,7 @@ describe("CSV exports", () => {
       expect(lines[0]!.split(",").length, file).toBeGreaterThan(3);
     }
     const audited = await prisma.auditLog.findMany({ where: { eventId: s.event.id, action: "export.downloaded" } });
-    expect(audited.map((a) => (a.after as { file: string }).file)).toEqual(FILES);
+    expect(audited.map((a) => (a.after as { file: string }).file)).toEqual(downloadable);
     expect((await verifyAuditChain()).ok).toBe(true);
   });
 
