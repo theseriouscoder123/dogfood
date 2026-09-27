@@ -46,6 +46,20 @@ enum CoiSource {
   detected
 }
 
+// How community voters prove who they are (T3). Strongest to weakest against fake voters:
+// invite codes (organizer controls supply), verified email (one inbox, one ballot),
+// accounts (anyone can register an account, so it relies on detection).
+enum VotingMode {
+  email
+  invite
+  accounts
+}
+
+enum BallotStatus {
+  counted
+  quarantined
+}
+
 enum QuestionType {
   short_text
   long_text
@@ -57,24 +71,28 @@ enum QuestionType {
 // ── identity ────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique // always stored lower-cased
-  name         String
-  passwordHash String? // null = cannot log in with a password (e.g. imported, not yet claimed)
-  isAdmin      Boolean  @default(false) // the only global role; everything else is per event
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique // always stored lower-cased
+  name            String
+  passwordHash    String? // null = cannot log in with a password (e.g. imported, not yet claimed)
+  emailVerifiedAt DateTime? @db.Timestamptz(3) // set when the user proves they read this inbox (sign-in link, reset link)
+  isAdmin         Boolean   @default(false) // the only global role; everything else is per event
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
 
   sessions       Session[]
   eventRoles     EventRole[]
   judgeTracks    JudgeTrack[]
   memberships    TeamMember[]
-  teamsCreated   Team[]               @relation("TeamCreatedBy")
+  teamsCreated   Team[]                @relation("TeamCreatedBy")
   invitesCreated TeamInvite[]
   assignments    Assignment[]
   batchesCreated AssignmentBatch[]
   conflicts      ConflictOfInterest[]
   runsCreated    NormalizationRun[]
   auditEntries   AuditLog[]
+  integrity      IntegrityResolution[]
+  voters         Voter[]
+  voteInvites    VoteInvite[]
   uploads        Upload[]
   passwordResets PasswordReset[]
 }
@@ -95,29 +113,34 @@ model Session {
 // ── event setup ─────────────────────────────────────────────────────────────
 
 model Event {
-  id                  String    @id @default(uuid()) @db.Uuid
-  slug                String    @unique
-  externalId          String?   @unique // id in an imported file, e.g. "evt_01"
+  id                  String     @id @default(uuid()) @db.Uuid
+  slug                String     @unique
+  externalId          String?    @unique // id in an imported file, e.g. "evt_01"
   name                String
-  description         String    @default("") // short summary for cards
-  tagline             String    @default("")
-  location            String    @default("Online")
-  overview            String    @default("") // markdown, shown on the event page
-  rules               String    @default("") // markdown
+  description         String     @default("") // short summary for cards
+  tagline             String     @default("")
+  location            String     @default("Online")
+  overview            String     @default("") // markdown, shown on the event page
+  rules               String     @default("") // markdown
   bannerUrl           String? // uploaded file (/api/files/...) or external URL
   logoUrl             String?
-  timezone            String    @default("UTC") // display only; every timestamp is stored in UTC
-  registrationOpensAt DateTime? @db.Timestamptz(3)
-  submissionsOpenAt   DateTime  @db.Timestamptz(3)
-  submissionsCloseAt  DateTime  @db.Timestamptz(3)
-  judgingOpensAt      DateTime? @db.Timestamptz(3)
-  judgingClosesAt     DateTime? @db.Timestamptz(3)
-  maxTeamSize         Int       @default(4)
-  publishedRunId      String?   @unique @db.Uuid // null = results hidden
-  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
+  timezone            String     @default("UTC") // display only; every timestamp is stored in UTC
+  registrationOpensAt DateTime?  @db.Timestamptz(3)
+  submissionsOpenAt   DateTime   @db.Timestamptz(3)
+  submissionsCloseAt  DateTime   @db.Timestamptz(3)
+  judgingOpensAt      DateTime?  @db.Timestamptz(3)
+  judgingClosesAt     DateTime?  @db.Timestamptz(3)
+  maxTeamSize         Int        @default(4)
+  votingOpensAt       DateTime?  @db.Timestamptz(3) // null = no community vote
+  votingClosesAt      DateTime?  @db.Timestamptz(3)
+  votingMode          VotingMode @default(email)
+  votesPerVoter       Int        @default(3) // each voter picks up to this many projects
+  voterDomains        String[]   @default([]) // allowed email domains; empty = anyone
+  publishedRunId      String?    @unique @db.Uuid // null = results hidden
+  createdAt           DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime   @updatedAt @db.Timestamptz(3)
 
-  publishedRun NormalizationRun?    @relation("PublishedRun", fields: [publishedRunId], references: [id])
+  publishedRun NormalizationRun?     @relation("PublishedRun", fields: [publishedRunId], references: [id])
   roles        EventRole[]
   tracks       Track[]
   prizes       Prize[]
@@ -130,9 +153,13 @@ model Event {
   reviews      Review[]
   judgeTracks  JudgeTrack[]
   conflicts    ConflictOfInterest[]
-  runs         NormalizationRun[]   @relation("EventRuns")
+  runs         NormalizationRun[]    @relation("EventRuns")
   auditEntries AuditLog[]
   questions    SubmissionQuestion[]
+  integrity    IntegrityResolution[]
+  voters       Voter[]
+  voteInvites  VoteInvite[]
+  ballots      Ballot[]
 }
 
 model EventRole {
@@ -267,15 +294,16 @@ model Project {
   createdAt     DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
-  event       Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  team        Team            @relation(fields: [teamId, eventId], references: [id, eventId], onDelete: Cascade)
-  track       Track?          @relation(fields: [trackId, eventId], references: [id, eventId])
-  duplicateOf Project?        @relation("Duplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
-  duplicates  Project[]       @relation("Duplicates")
-  assignments Assignment[]
-  reviews     Review[]
-  results     ProjectResult[]
-  answers     ProjectAnswer[]
+  event         Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  team          Team            @relation(fields: [teamId, eventId], references: [id, eventId], onDelete: Cascade)
+  track         Track?          @relation(fields: [trackId, eventId], references: [id, eventId])
+  duplicateOf   Project?        @relation("Duplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates    Project[]       @relation("Duplicates")
+  assignments   Assignment[]
+  reviews       Review[]
+  results       ProjectResult[]
+  answers       ProjectAnswer[]
+  ballotChoices BallotChoice[]
 
   @@unique([eventId, externalId])
   @@unique([id, eventId])
@@ -527,4 +555,118 @@ model PasswordReset {
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// An organizer's decision about one integrity flag. Flags are recomputed from the data every
+// time; the flag key is stable, so a decision stays attached to "the same" flag. History of
+// every decision (including reopening) lives in the audit log.
+model IntegrityResolution {
+  eventId      String   @db.Uuid
+  flagKey      String
+  status       String // "dismissed" (looked, it's fine) | "confirmed" (a real problem, acted on)
+  note         String   @default("")
+  resolvedById String?  @db.Uuid
+  resolvedAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  event      Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation(fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@id([eventId, flagKey])
+}
+
+// ── community voting (T3) ───────────────────────────────────────────────────
+
+// A one-time sign-in link sent by email. Using it proves the inbox, logs the person in (creating
+// a password-less account if needed) and marks the email verified. Used for voting and login.
+model LoginLink {
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String // lower-cased
+  tokenHash String    @unique
+  next      String    @default("/") // where to go after signing in (a path on this site)
+  ip        String?
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+}
+
+// Single-use ballot codes an organizer hands out (e.g. printed QR codes at a venue).
+// Only the hash is stored; the codes are shown once, when generated.
+model VoteInvite {
+  id          String    @id @default(uuid()) @db.Uuid
+  eventId     String    @db.Uuid
+  codeHash    String    @unique
+  label       String    @default("") // which batch: "Venue badges", "Sponsor booth"
+  createdById String?   @db.Uuid
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  voter     Voter?
+
+  @@index([eventId])
+}
+
+// One voting identity per person per event. identityKey is what makes a voter unique
+// ("user:<id>" or "invite:<id>"); emailKey is the normalized inbox, so john+1@x and j.o.h.n@x
+// (on providers that ignore dots) can't hold two ballots.
+model Voter {
+  id          String     @id @default(uuid()) @db.Uuid
+  eventId     String     @db.Uuid
+  kind        VotingMode
+  userId      String?    @db.Uuid
+  inviteId    String?    @unique @db.Uuid
+  identityKey String
+  emailKey    String?
+  tokenHash   String?    @unique // invite voters have no account; their browser holds this token
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+
+  event  Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invite VoteInvite? @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  ballot Ballot?
+
+  @@unique([eventId, identityKey])
+  @@unique([eventId, emailKey])
+}
+
+// A voter's picks. Editable until voting closes. Never readable by anyone but its voter while
+// voting is open; afterwards it is published anonymously under its receipt's hash.
+model Ballot {
+  id               String       @id @default(uuid()) @db.Uuid
+  eventId          String       @db.Uuid
+  voterId          String       @unique @db.Uuid
+  receipt          String       @unique // shown to the voter; lets them find their ballot in the published file
+  status           BallotStatus @default(counted)
+  quarantineReason String?
+  ip               String?
+  userAgent        String?
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
+
+  event   Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  voter   Voter          @relation(fields: [voterId], references: [id], onDelete: Cascade)
+  choices BallotChoice[]
+
+  @@index([eventId, status])
+}
+
+// position = where the project appeared on this voter's shuffled ballot (0 = first), kept so
+// the published data can show that list position didn't decide the result.
+model BallotChoice {
+  ballotId  String   @db.Uuid
+  projectId String   @db.Uuid
+  position  Int
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  ballot  Ballot  @relation(fields: [ballotId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([ballotId, projectId])
+  @@index([projectId])
 }

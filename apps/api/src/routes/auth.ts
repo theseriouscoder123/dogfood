@@ -114,7 +114,8 @@ authRouter.post("/reset", async (req, res) => {
   const passwordHash = await hashPassword(body.password);
   await prisma.$transaction([
     prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
-    prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
+    // Following a link from the inbox proves the address, so a reset also verifies it.
+    prisma.user.update({ where: { id: reset.userId }, data: { passwordHash, emailVerifiedAt: reset.user.emailVerifiedAt ?? new Date() } }),
     // A reset signs out every other device.
     prisma.session.deleteMany({ where: { userId: reset.userId, seeded: false } }),
   ]);
@@ -123,4 +124,63 @@ authRouter.post("/reset", async (req, res) => {
   const u = reset.user;
   await audit({ ...fromRequest(req), actor: { id: u.id, email: u.email, name: u.name, isAdmin: u.isAdmin }, action: "auth.password_reset", entityType: "User", entityId: u.id });
   res.json({ user: { id: u.id, email: u.email, name: u.name, isAdmin: u.isAdmin } });
+});
+
+// ── one-time sign-in links ──────────────────────────────────────────────────
+// "Email me a link": proves the inbox, signs the person in, and creates a password-less account
+// if there isn't one. This is what verified-email community voting is built on.
+
+const LINK_TTL_MS = 30 * 60 * 1000;
+const LINKS_PER_EMAIL_PER_HOUR = 5;
+const LINKS_PER_IP_PER_HOUR = 20;
+
+/** Only same-site paths, so a link can never be turned into an open redirect. */
+const safeNext = (next: string | undefined) => (next && /^\/(?!\/)[\w\-./?=&%]*$/.test(next) ? next : "/");
+
+authRouter.post("/link", async (req, res) => {
+  const body = z.object({ email, next: z.string().max(300).optional() }).parse(req.body);
+  const hourAgo = new Date(Date.now() - 3_600_000);
+  const ip = req.ip ?? null;
+  if (ip && (await prisma.loginLink.count({ where: { ip, createdAt: { gt: hourAgo } } })) >= LINKS_PER_IP_PER_HOUR)
+    throw new HttpError(429, "too_many_links", "Too many sign-in links from this network. Try again in an hour.");
+
+  const next = safeNext(body.next);
+  // Past the per-inbox limit we quietly send nothing: same answer either way.
+  if ((await prisma.loginLink.count({ where: { email: body.email, createdAt: { gt: hourAgo } } })) < LINKS_PER_EMAIL_PER_HOUR) {
+    const token = randomToken();
+    await prisma.loginLink.create({ data: { email: body.email, tokenHash: sha256(token), next, ip, expiresAt: new Date(Date.now() + LINK_TTL_MS) } });
+    const slug = next.match(/^\/events\/([\w-]+)\/vote/)?.[1];
+    const event = slug ? await prisma.event.findUnique({ where: { slug }, select: { name: true } }) : null;
+    await sendMail({
+      to: body.email,
+      subject: event ? `Your voting link for ${event.name}` : "Your Dogfood sign-in link",
+      heading: event ? `Vote in ${event.name}` : "Sign in to Dogfood",
+      body: [
+        event ? "Use this link to confirm your email and open your ballot." : "Use this link to sign in.",
+        "It works once and expires in 30 minutes. If you didn't ask for it, ignore this email.",
+      ],
+      action: { label: event ? "Open my ballot" : "Sign in", url: absoluteUrl(`/signin/${token}`) },
+    });
+  }
+  res.json({ ok: true });
+});
+
+authRouter.post("/link/verify", async (req, res) => {
+  const body = z.object({ token: z.string().min(10).max(200) }).parse(req.body);
+  const link = await prisma.loginLink.findUnique({ where: { tokenHash: sha256(body.token) } });
+  if (!link || link.usedAt || link.expiresAt <= new Date()) throw new HttpError(400, "invalid_link", "This sign-in link is invalid, used or expired. Ask for a new one.");
+
+  const user = await prisma.$transaction(async (tx) => {
+    const used = await tx.loginLink.updateMany({ where: { id: link.id, usedAt: null }, data: { usedAt: new Date() } });
+    if (used.count === 0) throw new HttpError(400, "invalid_link", "This sign-in link has already been used.");
+    const existing = await tx.user.findUnique({ where: { email: link.email } });
+    if (existing) return tx.user.update({ where: { id: existing.id }, data: { emailVerifiedAt: existing.emailVerifiedAt ?? new Date() } });
+    const local = link.email.split("@")[0]!.replace(/[._+-]+/g, " ").trim();
+    const name = local ? local.replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 60) : "Voter";
+    return tx.user.create({ data: { email: link.email, name, emailVerifiedAt: new Date() } });
+  });
+  const { token, expiresAt } = await createSession(user.id);
+  setSessionCookie(res, token, expiresAt);
+  await audit({ ...fromRequest(req), actor: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin }, action: "auth.link_signin", entityType: "User", entityId: user.id });
+  res.json({ user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin }, next: link.next });
 });

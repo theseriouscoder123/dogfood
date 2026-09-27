@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, Layers, Trophy, Users, UsersRound } from "lucide-react";
+import { Check, Heart, Layers, Trophy, Users, UsersRound } from "lucide-react";
 import type { EventDetail, Me, MyTeam } from "@/lib/types";
 import { phaseOf } from "@/lib/phase";
 import { formatDate } from "@/lib/format";
@@ -23,6 +23,12 @@ export function EventSidebar({ data, me, team }: { data: EventDetail; me: Me; te
     cta = (
       <Link href={`/events/${slug}/judging`} className={buttonClass("primary", "lg", "w-full")}>
         Open judging dashboard
+      </Link>
+    );
+  } else if (event.votingWindow === "open" && !isStaff) {
+    cta = (
+      <Link href={`/events/${slug}/vote`} className={buttonClass("accent", "lg", "w-full")}>
+        <Heart className="size-4" /> Vote for your favourites
       </Link>
     );
   } else if (event.resultsPublished) {
@@ -64,6 +70,8 @@ export function EventSidebar({ data, me, team }: { data: EventDetail; me: Me; te
     ["Submissions open", event.submissionsOpenAt],
     ["Submission deadline", event.submissionsCloseAt],
     ["Judging opens", event.judgingOpensAt],
+    ["Community voting opens", event.votingOpensAt],
+    ["Community voting closes", event.votingClosesAt],
     ["Winners announced", event.judgingClosesAt],
   ];
   const now = Date.now();
@@ -114,6 +122,7 @@ export function EventSidebar({ data, me, team }: { data: EventDetail; me: Me; te
         <ol className="relative space-y-4 before:absolute before:bottom-2 before:left-[9px] before:top-2 before:w-px before:bg-line">
           {timeline
             .filter(([, iso]) => iso)
+            .sort(([, a], [, b]) => new Date(a!).getTime() - new Date(b!).getTime())
             .map(([label, iso]) => {
               const done = new Date(iso!).getTime() <= now;
               return (

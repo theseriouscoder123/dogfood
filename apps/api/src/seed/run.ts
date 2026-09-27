@@ -8,7 +8,7 @@ import { hashPassword } from "../auth/password";
 import { sha256 } from "../lib/crypto";
 import { importFixtures } from "./importFixtures";
 import { seedShowcase } from "./showcase";
-import { DEMO_JUDGE_EMAIL, seedJudgingDemo } from "./judgingDemo";
+import { DEMO_JUDGE_EMAIL, DEMO_VOTER_EMAIL, seedJudgingDemo } from "./judgingDemo";
 
 const DEMO_PASSWORD = "dogfood2026";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "admin@dogfood.local").toLowerCase();
@@ -24,6 +24,8 @@ const DEMO_SESSIONS = [
   { label: "admin", token: "seed-admin", who: { email: ADMIN_EMAIL } },
   // Not used by the checker: a judge with live work in the "spring-build-sprint" demo event.
   { label: "judge_demo", token: "seed-judge-demo", who: { email: DEMO_JUDGE_EMAIL } },
+  // A verified community voter who hasn't voted yet in "spring-build-sprint".
+  { label: "voter", token: "seed-voter", who: { email: DEMO_VOTER_EMAIL } },
 ] as const;
 
 async function main() {

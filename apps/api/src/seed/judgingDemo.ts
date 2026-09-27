@@ -9,9 +9,11 @@
 import type { PrismaClient } from "@prisma/client";
 import { appendAudit } from "../audit";
 import { planAssignments, rng } from "../judging/assign";
+import { ballotOrder, makeReceipt, normalizeEmail } from "../voting/core";
 
 export const JUDGING_DEMO_SLUG = "spring-build-sprint";
 export const DEMO_JUDGE_EMAIL = "judge@dogfood.local";
+export const DEMO_VOTER_EMAIL = "voter@dogfood.local";
 
 const DAY = 86_400_000;
 const MIN = 60_000;
@@ -67,7 +69,7 @@ const JUDGES: Array<{ name: string; email: string; tracks: number[]; profile: Pr
   { name: "Chen Wei", email: "chen.wei@judges.example.org", tracks: [1, 2], profile: "most", bias: 0.2, minutes: [7, 18] },
   { name: "Dana Kowalski", email: "dana.kowalski@judges.example.org", tracks: [0], profile: "behind", bias: 0.6, minutes: [12, 30] },
   { name: "Eli Navarro", email: "eli.navarro@judges.example.org", tracks: [2], profile: "idle", bias: 0, minutes: [10, 20] },
-  { name: "Farah Haddad", email: "farah.haddad@judges.example.org", tracks: [], profile: "done", bias: 0, flat: 7, minutes: [1, 2] },
+  { name: "Farah Haddad", email: "farah.haddad@judges.example.org", tracks: [], profile: "done", bias: 0, flat: 7, minutes: [0.5, 1.8] },
   { name: "Gus Lindqvist", email: "gus.lindqvist@judges.example.org", tracks: [0, 2], profile: "half", bias: -0.6, minutes: [9, 22] },
   { name: "Jordan Lee", email: DEMO_JUDGE_EMAIL, tracks: [], profile: "demo", bias: 0.3, minutes: [6, 15] },
 ];
@@ -77,6 +79,19 @@ const CRITERIA = [
   { key: "technical_depth", label: "Technical depth", description: "How hard was the engineering, and how well was it done?", weight: 25 },
   { key: "originality", label: "Originality", description: "A new idea, or a familiar one done in a new way?", weight: 20 },
   { key: "presentation", label: "Presentation", description: "Can we understand it from the page, the demo and the README?", weight: 20 },
+];
+
+// A second sentence per review, so no two reviews read the same (real judges don't paste).
+const ASPECTS = [
+  "The onboarding could be one step shorter.",
+  "Error messages were clear when I broke things.",
+  "I'd like to see how it behaves with real data.",
+  "The architecture diagram in the README helped.",
+  "Tests exist, which is rare for a weekend build.",
+  "The demo video covers the main flow well.",
+  "Scope was sensible for the time available.",
+  "Accessibility needs another pass.",
+  "Performance felt fine on my laptop.",
 ];
 
 const COMMENTS = {
@@ -113,6 +128,11 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
           judgingOpensAt: judgingOpens,
           judgingClosesAt: hour(2),
           maxTeamSize: 3,
+          // A People's Choice vote runs alongside judging: verified email, 3 votes each.
+          votingOpensAt: judgingOpens,
+          votingClosesAt: hour(2),
+          votingMode: "email",
+          votesPerVoter: 3,
         },
       });
       await tx.eventRole.create({ data: { eventId: e.id, userId: organizerId, role: "organizer" } });
@@ -210,12 +230,19 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
           if (status !== "submitted" && status !== "in_progress") continue;
 
           const composite = 1 + p.quality * 8.5;
+          // Two planted problems for the integrity checks: Ava's first review says the project
+          // didn't run but scores it near the top, and Gus's first review is far below everyone else's.
+          const planted = i === 0 && status === "submitted" ? (j.name === "Ava Moreau" ? "mismatch" : j.name === "Gus Lindqvist" ? "outlier" : null) : null;
           const values = criteria.map((c, k) =>
-            j.flat ?? Math.max(1, Math.min(10, Math.round(composite + j.bias + (k === 2 ? (p.quality - 0.5) * 2 : 0) + between(-1.1, 1.1)))),
+            planted === "mismatch" ? (k === 2 ? 8 : 9)
+            : planted === "outlier" ? 1
+            : j.flat ?? Math.max(1, Math.min(10, Math.round(composite + j.bias + (k === 2 ? (p.quality - 0.5) * 2 : 0) + between(-1.1, 1.1)))),
           );
           const band = composite + j.bias >= 7 ? "high" : composite + j.bias >= 4.5 ? "mid" : "low";
-          // One comment that contradicts its score, for the integrity checks to find.
-          const comment = j.name === "Ava Moreau" && p.title === "Repair Café Finder" ? "Didn't run for me and the docs are thin." : COMMENTS[band][Math.floor(random() * 3)]!;
+                    const comment =
+            planted === "mismatch" ? "Didn't run for me and the docs are thin."
+            : planted === "outlier" ? "Not for me."
+            : `${COMMENTS[band][Math.floor(random() * 3)]!} ${ASPECTS[(PROJECTS.findIndex(([t]) => t === p.title) + JUDGES.indexOf(JUDGES.find((x) => x.email === j.email)!)) % ASPECTS.length]!}`;
           const draft = status === "in_progress";
           const review = await tx.review.create({
             data: {
@@ -232,9 +259,42 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
         }
       }
 
+      // Community voters: people who confirmed their email and picked up to 3 favourites. Taste
+      // follows project quality loosely, and each ballot is cast through the same shuffled order
+      // a real voter sees, so the stored positions are genuine.
+      const ballotIds = projects.map((p) => p.id);
+      let ballots = 0;
+      for (let v = 0; v < 34; v++) {
+        const email = `fan${String(v + 1).padStart(2, "0")}@community.example.org`;
+        const user = await tx.user.upsert({
+          where: { email },
+          update: {},
+          create: { email, name: `${PEOPLE[(v * 7) % PEOPLE.length]!.split(" ")[0]} (community)`, emailVerifiedAt: judgingOpens, passwordHash: demoPasswordHash },
+        });
+        const identityKey = `user:${user.id}`;
+        const order = ballotOrder(ballotIds, `${e.id}:${identityKey}`);
+        const appeal = projects.map((p) => ({ id: p.id, w: p.quality + between(-0.35, 0.35) })).sort((a, b) => b.w - a.w);
+        const picks = appeal.slice(0, 1 + (v % 3)).map((x) => x.id);
+        const castAt = new Date(judgingOpens.getTime() + between(0.5, 44) * 3_600_000);
+        const voter = await tx.voter.create({
+          data: { eventId: e.id, kind: "email", userId: user.id, identityKey, emailKey: normalizeEmail(email), ip: `203.0.113.${10 + v}`, userAgent: "Mozilla/5.0 (seed)", createdAt: castAt },
+        });
+        const ballot = await tx.ballot.create({
+          data: { eventId: e.id, voterId: voter.id, receipt: makeReceipt(), ip: voter.ip, userAgent: voter.userAgent, createdAt: castAt, updatedAt: castAt },
+        });
+        await tx.ballotChoice.createMany({ data: picks.map((projectId) => ({ ballotId: ballot.id, projectId, position: order.indexOf(projectId), createdAt: castAt })) });
+        ballots++;
+      }
+      // A verified voter who hasn't voted yet, for trying the ballot live (Cookie: sid=seed-voter).
+      await tx.user.upsert({
+        where: { email: DEMO_VOTER_EMAIL },
+        update: {},
+        create: { email: DEMO_VOTER_EMAIL, name: "Riley Voter", emailVerifiedAt: judgingOpens, passwordHash: demoPasswordHash },
+      });
+
       await appendAudit(tx, {
         eventId: e.id, actorLabel: "system:seed", action: "event.create", entityType: "Event", entityId: e.id,
-        after: { slug: e.slug, demo: true, projects: projects.length, judges: judges.length, assignments: plan.assignments.length, ...counts },
+        after: { slug: e.slug, demo: true, projects: projects.length, judges: judges.length, assignments: plan.assignments.length, ...counts, ballots },
       });
     },
     { timeout: 120_000 },

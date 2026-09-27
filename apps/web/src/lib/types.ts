@@ -55,6 +55,11 @@ export type EventDetail = {
     submissionWindow: SubmissionWindow;
     registrationWindow: SubmissionWindow;
     resultsPublished: boolean;
+    votingOpensAt: string | null;
+    votingClosesAt: string | null;
+    votingWindow: VotingWindow;
+    votingMode: VotingMode;
+    votesPerVoter: number;
   };
   stats: { participants: number; teams: number; projects: number; prizeTotal: string | null };
   tracks: Track[];
@@ -375,4 +380,77 @@ export type PublicResults = {
     provisional: boolean;
     project: { id: string; title: string; tagline: string; thumbnailUrl: string | null; team: string; members: string[]; track: { id: string; name: string } | null };
   }>;
+};
+
+export type IntegrityFlagType =
+  | "outlier"
+  | "comment_mismatch"
+  | "identical_criteria"
+  | "low_discrimination"
+  | "disagrees_with_panel"
+  | "rushed"
+  | "fast_reviewer"
+  | "copy_paste";
+export type IntegrityFlag = {
+  key: string;
+  type: IntegrityFlagType;
+  severity: "high" | "medium" | "low";
+  judgeId: string;
+  projectId: string | null;
+  reviewId: string | null;
+  summary: string;
+  evidence: Record<string, unknown>;
+  judge: { id: string; name: string; externalId: string | null };
+  project: { id: string; title: string; externalId: string | null } | null;
+  resolution: { status: "dismissed" | "confirmed"; note: string; by: string | null; at: string } | null;
+};
+export type IntegrityReport = {
+  summary: { reviewsChecked: number; judges: number; timedReviews: number; commentedReviews: number; flags: number; open: number; byType: Record<string, number> };
+  reliability: { single: number; average: number; reviewsPerProject: number; projects: number; reliable: boolean } | null;
+  flags: IntegrityFlag[];
+};
+
+export type VotingWindow = "off" | "not_open" | "open" | "closed";
+export type VotingMode = "email" | "invite" | "accounts";
+export type VoteStatus =
+  | "allow"
+  | "closed"
+  | "voting_not_open"
+  | "unauthenticated"
+  | "email_unverified"
+  | "invite_required"
+  | "domain_not_allowed"
+  | "staff_cannot_vote"
+  | "duplicate_inbox";
+export type BallotProject = {
+  id: string;
+  title: string;
+  tagline: string;
+  thumbnailUrl: string | null;
+  position: number;
+  team: string;
+  members: string[];
+  track: { id: string; name: string } | null;
+  ownTeam: boolean;
+};
+export type VoteView = {
+  event: { slug: string; name: string };
+  window: VotingWindow;
+  opensAt: string | null;
+  closesAt: string | null;
+  mode: VotingMode;
+  votesPerVoter: number;
+  voterDomains: string[];
+  status: VoteStatus;
+  me: { email: string | null; via: VotingMode } | null;
+  ballot: { choices: string[]; receipt: string; updatedAt: string } | null;
+  projects: BallotProject[];
+};
+export type VotingAdmin = {
+  settings: { opensAt: string | null; closesAt: string | null; mode: VotingMode; votesPerVoter: number; voterDomains: string[] };
+  window: VotingWindow;
+  submissionsCloseAt: string;
+  turnout: { voters: number; byKind: Partial<Record<VotingMode, number>>; ballots: number; choices: number; lastBallotAt: string | null };
+  locked: boolean;
+  invites: Array<{ label: string; total: number; redeemed: number; revoked: number; createdAt: string }>;
 };

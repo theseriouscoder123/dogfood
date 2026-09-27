@@ -129,6 +129,39 @@ export function decideScore(a: EventAccess, window: JudgingWindow, assignment: {
   return "allow";
 }
 
+export type VotingWindow = "off" | "not_open" | "open" | "closed";
+
+/** Community voting runs from votingOpensAt to votingClosesAt; without an opening time it's off. */
+export function votingWindow(event: { votingOpensAt: Date | null; votingClosesAt: Date | null }, now: Date = new Date()): VotingWindow {
+  if (!event.votingOpensAt) return "off";
+  if (now < event.votingOpensAt) return "not_open";
+  if (event.votingClosesAt && now >= event.votingClosesAt) return "closed";
+  return "open";
+}
+
+export type VoterIdentity =
+  | { kind: "none" }
+  | { kind: "user"; emailVerified: boolean; domainAllowed: boolean }
+  | { kind: "invite" };
+
+/**
+ * Casting or changing a community vote. The window comes first (so everyone sees the same reason
+ * when voting is closed), then who you are: organizers and judges have their own say in the
+ * result and don't vote in the community one; then whether the event's voting mode accepts
+ * the identity you have. "Is this project yours" is checked per project by the caller.
+ */
+export function decideVote(a: EventAccess, window: VotingWindow, mode: "email" | "invite" | "accounts", id: VoterIdentity): Outcome {
+  if (window === "off") return "voting_off";
+  if (window === "not_open") return "voting_not_open";
+  if (window === "closed") return "voting_closed";
+  if (a.roles.has("organizer") || a.roles.has("judge")) return "staff_cannot_vote";
+  if (mode === "invite") return id.kind === "invite" ? "allow" : "invite_required";
+  if (id.kind !== "user") return "unauthenticated";
+  if (!id.domainAllowed) return "domain_not_allowed";
+  if (mode === "email" && !id.emailVerified) return "email_unverified";
+  return "allow";
+}
+
 export type Outcome =
   | Decision
   | "closed"
@@ -138,7 +171,14 @@ export type Outcome =
   | "judge_conflict"
   | "judging_not_open"
   | "judging_closed"
-  | "recused";
+  | "recused"
+  | "voting_off"
+  | "voting_not_open"
+  | "voting_closed"
+  | "staff_cannot_vote"
+  | "invite_required"
+  | "domain_not_allowed"
+  | "email_unverified";
 
 const refusals: Record<Exclude<Outcome, "allow">, () => HttpError> = {
   unauthenticated,
@@ -151,6 +191,13 @@ const refusals: Record<Exclude<Outcome, "allow">, () => HttpError> = {
   judging_not_open: () => new HttpError(403, "judging_not_open", "Judging hasn't opened yet."),
   judging_closed: () => new HttpError(403, "judging_closed", "Judging has closed; reviews can no longer change."),
   recused: () => new HttpError(409, "recused", "You recused yourself from this project."),
+  voting_off: () => new HttpError(404, "voting_off", "This event doesn't have community voting."),
+  voting_not_open: () => new HttpError(403, "voting_not_open", "Voting hasn't opened yet."),
+  voting_closed: () => new HttpError(403, "voting_closed", "Voting has closed."),
+  staff_cannot_vote: () => new HttpError(403, "staff_cannot_vote", "Organizers and judges have their own say in the results, so they don't vote in the community vote."),
+  invite_required: () => new HttpError(403, "invite_required", "Voting in this event needs a ballot code from the organizers."),
+  domain_not_allowed: () => new HttpError(403, "domain_not_allowed", "Voting is limited to email addresses from the organizers' allowed domains."),
+  email_unverified: () => new HttpError(403, "email_unverified", "Confirm your email first: we'll send you a one-time voting link."),
 };
 
 /** Turn a decision into the matching HTTP error. */

@@ -21,6 +21,9 @@ import { HttpError, notFound } from "../lib/http";
 import { DEFAULT_PARAMS } from "../judging/normalize";
 import { computeResults, inputHash, loadResultInputs, METHOD, normalizeOptions, persistRun, type ComputedResults, type ResultInputs, type RunOptions } from "../judging/results";
 import { reviewTarget } from "./progress";
+import { computeIntegrity } from "./integrity";
+import { buildProofReport } from "../judging/proof";
+import { compositeScore } from "../judging/composite";
 
 export const resultsRouter = Router({ mergeParams: true });
 
@@ -191,6 +194,45 @@ resultsRouter.post("/normalization/unpublish", async (req, res) => {
     await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "results.unpublished", entityType: "Event", entityId: event.id, before: { publishedRunId: event.publishedRunId } });
   });
   res.json({ publishedRunId: null });
+});
+
+/**
+ * The normalization proof for this event, as Markdown: raw vs adjusted ranking, judge leniency,
+ * a seeded simulation on this event's own judge–project graph, and the integrity checks.
+ * Contains judge names and scores, so it's organizer-only and every download is audited.
+ */
+resultsRouter.get("/normalization/report.md", async (req, res) => {
+  const event = await staffEvent(req);
+  const [inputs, integrity, target] = await Promise.all([loadResultInputs(prisma, event.id), computeIntegrity(event.id), reviewTarget(event.id)]);
+  if (inputs.reviews.length === 0) throw new HttpError(409, "no_reviews", "There are no submitted reviews yet.");
+  const computed = computeResults(inputs, normalizeOptions({ minReviews: target }));
+  const judgeable = new Set(inputs.projects.filter((p) => !p.duplicateOfId).map((p) => p.id));
+  const observations = inputs.reviews
+    .filter((r) => judgeable.has(r.projectId))
+    .map((r) => ({ judgeId: r.judgeId, projectId: r.projectId, score: compositeScore(r.scores, inputs.criteria) }))
+    .filter((o): o is { judgeId: string; projectId: string; score: number } => o.score !== null);
+  const judge = new Map(inputs.judges.map((j) => [j.id, j]));
+  const project = new Map(inputs.projects.map((p) => [p.id, p]));
+  const report = buildProofReport({
+    title: event.name,
+    computed,
+    observations,
+    integrity: {
+      flags: integrity.flags,
+      reliability: integrity.reliability,
+      judgeName: (id) => judge.get(id)?.name ?? "Former judge",
+      projectName: (id) => project.get(id)?.title ?? "?",
+    },
+    sim: { sims: 150 },
+    command: `GET /api/events/${event.slug}/normalization/report.md`,
+  });
+  await prisma.$transaction((tx) =>
+    appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "export.downloaded", entityType: "Event", entityId: event.id, after: { file: "normalization-report.md" } }),
+  );
+  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${event.slug}-normalization-report.md"`);
+  res.setHeader("Cache-Control", "no-store");
+  res.send(report);
 });
 
 /** Public. Only what a leaderboard needs: no judge data, no raw scores, no uncertainty internals. */

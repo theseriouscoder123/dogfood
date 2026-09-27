@@ -25,6 +25,7 @@ export default async function EventHubLayout({ children, params }: { children: R
     { href: `${base}/prizes`, label: "Prizes", count: data.prizes.length || undefined },
     { href: `${base}/rules`, label: "Rules" },
     { href: `${base}/projects`, label: "Projects", count: stats.projects },
+    ...(event.votingWindow !== "off" ? [{ href: `${base}/vote`, label: "Vote" }] : []),
     ...(event.resultsPublished ? [{ href: `${base}/results`, label: "Results" }] : []),
     ...(me.user && (myRoles.includes("participant") || team?.team) ? [{ href: `${base}/team`, label: "My team" }] : []),
     ...(myRoles.includes("judge") ? [{ href: `${base}/judging`, label: "Judging" }] : []),

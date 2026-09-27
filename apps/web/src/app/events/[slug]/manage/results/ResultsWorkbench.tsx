@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, Eye, EyeOff, FlaskConical, History, Lock, Minus, Save, Send, SlidersHorizontal, UserX, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, Eye, EyeOff, FileDown, FlaskConical, History, Lock, Minus, Save, Send, SlidersHorizontal, UserX, X } from "lucide-react";
 import { send } from "@/lib/client";
 import type { JudgeStatRow, NormalizationState, ResultRow, ResultsView, RunOptions } from "@/lib/types";
 import { formatDate } from "@/lib/format";
-import { Button, Card, ErrorText, inputClass, Pill, SuccessText } from "@/components/ui";
+import { Button, buttonClass, Card, ErrorText, inputClass, Pill, SuccessText } from "@/components/ui";
 import { Avatar } from "@/components/visuals";
 
 const PROJECT_FLAG: Record<string, { label: string; tone: "warn" | "danger" | "neutral"; title: string }> = {
@@ -68,7 +68,7 @@ const JUDGE_FLAG: Record<
 
 const fmt = (x: number | null, d = 2) => (x === null ? "–" : x.toFixed(d));
 
-export function ResultsWorkbench({ slug, state, initial }: { slug: string; state: NormalizationState; initial: ResultsView }) {
+export function ResultsWorkbench({ slug, state, initial, exclude }: { slug: string; state: NormalizationState; initial: ResultsView; exclude?: string }) {
   const router = useRouter();
   const base = `/api/events/${slug}/normalization`;
   const [view, setView] = useState<ResultsView>(initial);
@@ -76,10 +76,10 @@ export function ResultsWorkbench({ slug, state, initial }: { slug: string; state
   const [tab, setTab] = useState<"projects" | "judges">("projects");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
-  const [excluding, setExcluding] = useState<{
-    judgeId: string;
-    reason: string;
-  } | null>(null);
+  // Arriving from an integrity flag ("Exclude judge…") opens the exclusion dialog straight away.
+  const [excluding, setExcluding] = useState<{ judgeId: string; reason: string } | null>(() =>
+    exclude && state.judges.some((j) => j.id === exclude) && !initial.options.excludedJudges.some((e) => e.judgeId === exclude) ? { judgeId: exclude, reason: "" } : null,
+  );
 
   const isRun = !!view.run;
   const canPublish = state.judgingWindow === "closed";
@@ -187,6 +187,9 @@ export function ResultsWorkbench({ slug, state, initial }: { slug: string; state
             </Pill>
           )}
           <div className="ml-auto flex gap-2">
+            <a href={`${base}/report.md`} download className={buttonClass("ghost", "sm")} title="Raw vs adjusted, judge leniency, a simulation on this event's graph, and the integrity checks">
+              <FileDown className="size-4" /> Proof report
+            </a>
             {isRun ? (
               <>
                 <Button variant="secondary" size="sm" onClick={() => preview(options)} disabled={busy}>

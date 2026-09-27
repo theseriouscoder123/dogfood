@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db";
-import { accessFor, registrationWindow, submissionWindow } from "../policy";
+import { accessFor, registrationWindow, submissionWindow, votingWindow } from "../policy";
 import { eventBySlug } from "../lib/events";
 import { scoreCount } from "./judgingAdmin";
 
@@ -75,6 +75,11 @@ eventsRouter.get("/:slug", async (req, res) => {
       submissionWindow: submissionWindow(event),
       registrationWindow: registrationWindow(event),
       resultsPublished: event.publishedRunId !== null,
+      votingOpensAt: event.votingOpensAt,
+      votingClosesAt: event.votingClosesAt,
+      votingWindow: votingWindow(event),
+      votingMode: event.votingMode,
+      votesPerVoter: event.votesPerVoter,
     },
     stats: { participants: participantCount, teams: teamCount, projects: projectCount, prizeTotal: prizeTotal(prizes.map((p) => p.value)) },
     tracks: tracks.map(({ _count, ...t }) => ({ ...t, projectCount: _count.projects })),

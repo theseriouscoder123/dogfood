@@ -4,8 +4,9 @@ import { ResultsWorkbench } from "./ResultsWorkbench";
 
 export const metadata = { title: "Results" };
 
-export default async function ResultsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ResultsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ exclude?: string }> }) {
   const { slug } = await params;
+  const { exclude } = await searchParams;
   const base = `/api/events/${encodeURIComponent(slug)}/normalization`;
   const state = await api<NormalizationState>(base);
   // Open on what the public sees if something is published; otherwise on a live preview.
@@ -29,7 +30,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ slug: 
       {state.reviewsSubmitted === 0 ? (
         <p className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">No reviews have been submitted yet. Results appear here as judges submit.</p>
       ) : (
-        <ResultsWorkbench slug={slug} state={state} initial={initial} />
+        <ResultsWorkbench slug={slug} state={state} initial={initial} exclude={exclude} />
       )}
     </div>
   );

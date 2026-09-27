@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Event, PrismaClient } from "@prisma/client";
 import { appendAudit } from "../audit";
+import { detectDuplicates } from "./duplicates";
 
 const Id = z.string().min(1);
 export const FixtureFile = z.object({
@@ -45,8 +46,6 @@ const HOUR = 3_600_000;
 const slugify = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const titleCase = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const nameFromEmail = (email: string) => titleCase(email.split("@")[0]!.replace(/[0-9._]+/g, " ").trim() || email);
-const normUrl = (u: string) => u.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "").replace(/\.git$/, "");
-const normTitle = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ");
 
 function lookup<V>(map: Map<string, V>, key: string, what: string): V {
   const v = map.get(key);
@@ -142,33 +141,21 @@ export async function importFixtures(
       // Projects, oldest first, so the first entry of a duplicate pair is the canonical one.
       // Duplicate = same team and (same repo or same title). The later entry is flagged, not deleted.
       const projectId = new Map<string, string>();
-      const seen = new Map<string, string>();
       const duplicates: ImportSummary["duplicates"] = [];
-      const projectRows = [...fx.projects]
-        .sort((a, b) => a.submitted_at.localeCompare(b.submitted_at) || a.id.localeCompare(b.id))
-        .map((p) => {
-          const id = randomUUID();
-          projectId.set(p.id, id);
-          const keys: Array<[string, string]> = [[`${p.team}|title|${normTitle(p.title)}`, "same team and title"]];
-          if (p.repo_url) keys.unshift([`${p.team}|repo|${normUrl(p.repo_url)}`, "same team and repository"]);
-          const hit = keys.find(([k]) => seen.has(k));
-          if (hit) {
-            const original = seen.get(hit[0])!;
-            const originalExt = [...projectId].find(([, v]) => v === original)![0];
-            duplicates.push({ project: p.id, duplicateOf: originalExt, reason: hit[1] });
-          } else {
-            for (const [k] of keys) seen.set(k, id);
-          }
-          return {
-            id, eventId, externalId: p.id,
-            teamId: lookup(teamId, p.team, "team"),
-            trackId: lookup(trackId, p.track, "track"),
-            title: p.title, tagline: p.summary, repoUrl: p.repo_url ?? null,
-            status: "submitted" as const,
-            submittedAt: new Date(p.submitted_at),
-            duplicateOfId: hit ? seen.get(hit[0])! : null,
-          };
-        });
+      const projectRows = detectDuplicates(fx.projects).map(({ project: p, duplicateOf, reason }) => {
+        const id = randomUUID();
+        projectId.set(p.id, id);
+        if (duplicateOf) duplicates.push({ project: p.id, duplicateOf, reason: reason! });
+        return {
+          id, eventId, externalId: p.id,
+          teamId: lookup(teamId, p.team, "team"),
+          trackId: lookup(trackId, p.track, "track"),
+          title: p.title, tagline: p.summary, repoUrl: p.repo_url ?? null,
+          status: "submitted" as const,
+          submittedAt: new Date(p.submitted_at),
+          duplicateOfId: duplicateOf ? projectId.get(duplicateOf)! : null,
+        };
+      });
       await tx.project.createMany({ data: projectRows });
 
       // Scores: one batch for the import, then assignment → review → per-criterion values.
