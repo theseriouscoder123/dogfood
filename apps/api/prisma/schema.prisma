@@ -400,6 +400,7 @@ model NormalizationRun {
   weights        Json // criterion key -> weight, as used by this run
   inputHash      String // sha256 of the reviews that went in
   componentCount Int // connected components of the judge-project graph
+  summary        Json     @default("{}") // μ, σ, iterations, rank agreement, exclusions (with reasons)
   createdById    String?  @db.Uuid
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
@@ -414,10 +415,14 @@ model ProjectResult {
   runId           String   @db.Uuid
   projectId       String   @db.Uuid
   nReviews        Int
-  rawScore        Float
-  normalizedScore Float
+  rawScore        Float? // null = no reviews
+  normalizedScore Float?
   stdError        Float?
-  rank            Int
+  rank            Int? // null = not ranked (duplicate, or no reviews)
+  rawRank         Int?
+  rankLow         Int? // 5th–95th percentile rank from the uncertainty simulation
+  rankHigh        Int?
+  pTop            Float? // chance of finishing in the top k (k = number of overall prizes, min 3)
   flags           String[] @default([])
 
   run     NormalizationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
@@ -430,6 +435,7 @@ model JudgeStat {
   runId    String   @db.Uuid
   judgeId  String   @db.Uuid
   nReviews Int
+  rawMean  Float?
   offset   Float
   stdDev   Float?
   flags    String[] @default([])

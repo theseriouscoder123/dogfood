@@ -25,6 +25,12 @@ export function EventSidebar({ data, me, team }: { data: EventDetail; me: Me; te
         Open judging dashboard
       </Link>
     );
+  } else if (event.resultsPublished) {
+    cta = (
+      <Link href={`/events/${slug}/results`} className={buttonClass("accent", "lg", "w-full")}>
+        <Trophy className="size-4" /> See the results
+      </Link>
+    );
   } else if (!me.user && regOpen) {
     cta = (
       <Link href={`/register?next=/events/${slug}/team`} className={buttonClass("accent", "lg", "w-full")}>

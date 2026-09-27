@@ -14,6 +14,7 @@ import { eventBySlug } from "../lib/events";
 import { notFound } from "../lib/http";
 import { toCsv } from "../lib/csv";
 import { compositeScore, type CriterionSpec } from "../judging/composite";
+import { computeResults, loadResultInputs, normalizeOptions } from "../judging/results";
 import { reviewTarget } from "./progress";
 
 export const exportsRouter = Router({ mergeParams: true });
@@ -218,37 +219,34 @@ const EXPORTS: ExportDef[] = [
     file: "results.csv",
     title: "Results",
     stage: "Results",
-    description: "Ranking by mean weighted score per project, with review counts and flags.",
+    description: "The ranking: raw and normalized scores, rank ranges and flags. Uses the published run, or a live computation until one is published.",
     async build(event) {
-      const [{ specs }, target, projects] = await Promise.all([
-        criteriaSpecs(event.id),
-        reviewTarget(event.id),
-        prisma.project.findMany({
-          where: { eventId: event.id, status: "submitted" },
-          select: {
-            id: true, externalId: true, title: true, duplicateOfId: true,
-            team: { select: { name: true } },
-            track: { select: { name: true } },
-            reviews: { where: { status: "submitted" }, select: { scores: { select: { criterionId: true, value: true } } } },
-          },
-        }),
-      ]);
-      const rows = projects.map((p) => {
-        const composites = p.reviews
-          .map((r) => compositeScore(new Map(r.scores.map((s) => [s.criterionId, s.value])), specs))
-          .filter((x): x is number => x !== null);
-        const raw = composites.length ? composites.reduce((a, b) => a + b, 0) / composites.length : null;
-        const flags = [p.duplicateOfId ? "duplicate" : null, composites.length < target ? "provisional" : null].filter(Boolean).join(";");
-        return { p, raw, n: composites.length, flags };
-      });
-      rows.sort((a, b) => Number(!!a.p.duplicateOfId) - Number(!!b.p.duplicateOfId) || (b.raw ?? -1) - (a.raw ?? -1) || a.p.title.localeCompare(b.p.title));
-      let rank = 0;
+      const f = (x: number | null, d = 3) => (x === null ? "" : x.toFixed(d));
+      const header = [
+        "rank", "project_id", "external_id", "title", "team", "track", "n_reviews", "raw_score", "normalized_score", "std_error",
+        "raw_rank", "rank_low", "rank_high", "p_top_k", "flags", "source",
+      ];
+      if (event.publishedRunId) {
+        const rows = await prisma.projectResult.findMany({
+          where: { runId: event.publishedRunId },
+          include: { project: { select: { externalId: true, title: true, team: { select: { name: true } }, track: { select: { name: true } } } } },
+        });
+        rows.sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.project.title.localeCompare(b.project.title));
+        return {
+          header,
+          rows: rows.map((r) => [
+            r.rank ?? "", r.projectId, r.project.externalId, r.project.title, r.project.team.name, r.project.track?.name ?? "", r.nReviews,
+            f(r.rawScore), f(r.normalizedScore), f(r.stdError), r.rawRank ?? "", r.rankLow ?? "", r.rankHigh ?? "", f(r.pTop, 2), r.flags.join(";"), `published run ${r.runId}`,
+          ]),
+        };
+      }
+      const inputs = await loadResultInputs(prisma, event.id);
+      const computed = computeResults(inputs, normalizeOptions({ minReviews: await reviewTarget(event.id) }));
       return {
-        header: ["rank", "project_id", "external_id", "title", "team", "track", "n_reviews", "raw_score", "flags"],
-        rows: rows.map((r) => [
-          r.p.duplicateOfId ? "" : ++rank,
-          r.p.id, r.p.externalId, r.p.title, r.p.team.name, r.p.track?.name ?? "",
-          r.n, r.raw === null ? "" : r.raw.toFixed(3), r.flags,
+        header,
+        rows: computed.projects.map((p) => [
+          p.rank ?? "", p.projectId, p.externalId, p.title, p.team, p.track?.name ?? "", p.nReviews,
+          f(p.rawScore), f(p.normalizedScore), f(p.stdError), p.rawRank ?? "", p.rankLow ?? "", p.rankHigh ?? "", f(p.pTop, 2), p.flags.join(";"), "live (not published)",
         ]),
       };
     },

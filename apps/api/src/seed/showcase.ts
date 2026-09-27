@@ -4,6 +4,7 @@
 // Only fills gaps: nothing an organizer has edited is overwritten.
 import type { PrismaClient } from "@prisma/client";
 import { appendAudit } from "../audit";
+import { normalizeOptions, persistRun } from "../judging/results";
 
 const DAY = 86_400_000;
 
@@ -67,6 +68,19 @@ export async function seedShowcase(prisma: PrismaClient, sampleEventId: string, 
         { eventId: sample.id, name: "Best judging engine", value: "$100", rank: 4, description: "Most defensible assignment and normalization." },
       ],
     });
+  }
+
+  // The fixture event finished long ago: compute its results once and publish them, exactly as
+  // an organizer would (same code path, audited as the seed). Unpublish or recompute freely.
+  if (!sample.publishedRunId && (await prisma.normalizationRun.count({ where: { eventId: sample.id } })) === 0) {
+    await prisma.$transaction(
+      async (tx) => {
+        const { run, hash } = await persistRun(tx, sample.id, normalizeOptions({ minReviews: 3 }), null);
+        await tx.event.update({ where: { id: sample.id }, data: { publishedRunId: run.id } });
+        await appendAudit(tx, { eventId: sample.id, actorLabel: "system:seed", action: "results.published", entityType: "NormalizationRun", entityId: run.id, after: { publishedRunId: run.id, inputHash: hash } });
+      },
+      { timeout: 60_000 },
+    );
   }
 
   if (await prisma.event.findUnique({ where: { slug: "dogfood-demo-jam" } })) return;

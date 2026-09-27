@@ -284,3 +284,95 @@ export type RedistributePreview = {
   unplaced: Array<{ projectId: string; title: string; have: number; need: number; reason: string }>;
 };
 export type ExportItem = { file: string; title: string; stage: string; description: string; rows: number; columns: number; url: string };
+
+export type RunOptions = { lambdaJudge: number; lambdaProject: number; minReviews: number; excludedJudges: Array<{ judgeId: string; reason: string }> };
+export type RunSummary = {
+  mu: number;
+  sigma: number;
+  iterations: number;
+  converged: boolean;
+  components: number;
+  reviewsUsed: number;
+  reviewsExcluded: number;
+  projectsRanked: number;
+  judgesUsed: number;
+  topK: number;
+  minReviews: number;
+  rankAgreement: number | null;
+  rankChanges: number;
+  excluded: Array<{ judgeId: string; name: string; reason: string }>;
+};
+export type ResultRow = {
+  projectId: string;
+  externalId: string | null;
+  title: string;
+  tagline: string;
+  thumbnailUrl: string | null;
+  team: string;
+  track: { id: string; name: string } | null;
+  nReviews: number;
+  rawScore: number | null;
+  normalizedScore: number | null;
+  stdError: number | null;
+  rank: number | null;
+  rawRank: number | null;
+  rankLow: number | null;
+  rankHigh: number | null;
+  pTop: number | null;
+  flags: string[];
+};
+export type JudgeStatRow = {
+  judgeId: string;
+  name: string;
+  externalId: string | null;
+  nReviews: number;
+  rawMean: number | null;
+  offset: number;
+  stdDev: number | null;
+  flags: string[];
+  exclusionReason: string | null;
+};
+export type RunListItem = {
+  id: string;
+  method: string;
+  createdAt: string;
+  createdBy: string | null;
+  inputHash: string;
+  options: RunOptions;
+  summary: RunSummary;
+  componentCount: number;
+  published: boolean;
+  stale: boolean;
+};
+export type NormalizationState = {
+  judgingWindow: JudgingWindow;
+  publishedRunId: string | null;
+  reviewsSubmitted: number;
+  defaults: { lambdaJudge: number; lambdaProject: number; minReviews: number };
+  judges: Array<{ id: string; name: string; externalId: string | null }>;
+  runs: RunListItem[];
+};
+export type ResultsView = {
+  summary: RunSummary;
+  projects: ResultRow[];
+  judges: JudgeStatRow[];
+  options: RunOptions;
+  /** Present for a saved run. */
+  run?: { id: string; method: string; createdAt: string; createdBy: string | null; inputHash: string; published: boolean; stale: boolean };
+  /** Present for a preview: the rank each project has in the published run. */
+  publishedRanks?: Record<string, number | null> | null;
+  inputHash?: string;
+};
+export type PublicResults = {
+  event: { slug: string; name: string };
+  publishedRun: { id: string; method: string; computedAt: string };
+  tracks: Array<{ id: string; name: string }>;
+  prizes: Array<{ id: string; name: string; value: string; rank: number | null; trackId: string | null }>;
+  results: Array<{
+    rank: number;
+    score: number;
+    reviews: number;
+    provisional: boolean;
+    project: { id: string; title: string; tagline: string; thumbnailUrl: string | null; team: string; members: string[]; track: { id: string; name: string } | null };
+  }>;
+};
