@@ -12,6 +12,7 @@ import { eventAdminRouter } from "./routes/eventAdmin";
 import { invitesRouter, teamsRouter } from "./routes/teams";
 import { filesRouter, uploadsRouter } from "./routes/uploads";
 import { judgingAdminRouter } from "./routes/judgingAdmin";
+import { assignmentsRouter } from "./routes/assignments";
 
 export function createApp() {
   const app = express();
@@ -37,6 +38,7 @@ export function createApp() {
   app.use("/api/events", eventsRouter);
   app.use("/api/events", eventAdminRouter);
   app.use("/api/events/:slug", judgingAdminRouter);
+  app.use("/api/events/:slug", assignmentsRouter);
   app.use("/api/events/:slug/teams", teamsRouter);
   app.use("/api/events/:slug/projects", projectsRouter);
   app.use("/api/events/:slug/judges", judgingRouter);

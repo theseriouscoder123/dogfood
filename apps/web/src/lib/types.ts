@@ -149,3 +149,38 @@ export type JudgeRow = {
 
 export type ConflictRow = { id: string; source: "declared" | "detected"; note: string; createdAt: string; judge: { id: string; name: string }; team: { id: string; name: string } };
 export type TeamRow = { id: string; name: string; externalId: string | null; members: Array<{ name: string; email: string }>; projects: Array<{ id: string; title: string; status: string }> };
+
+export type AssignmentStatus = "assigned" | "in_progress" | "submitted" | "recused";
+export type LoadStats = { min: number; max: number; mean: number; stdev: number };
+export type AssignPreview = {
+  params: { reviewsPerProject: number; maxPerJudge: number | null; seed: number; mode: "fill" | "simulate" };
+  inputHash: string;
+  canCommit: boolean;
+  summary: {
+    projects: number;
+    judges: number;
+    existing: number;
+    newAssignments: number;
+    shortfalls: number;
+    components: number;
+    coverage: Record<string, number>;
+    loadBefore: LoadStats;
+    loadAfter: LoadStats;
+  };
+  judges: Array<{ id: string; name: string; before: number; after: number }>;
+  assignments: Array<{ judgeId: string; projectId: string; judgeName?: string; projectTitle?: string }>;
+  shortfalls: Array<{ projectId: string; have: number; need: number; reason: string; projectTitle?: string; track: string | null }>;
+};
+export type CoverageRow = {
+  id: string;
+  title: string;
+  externalId: string | null;
+  track: { id: string; name: string } | null;
+  team: string;
+  duplicate: boolean;
+  active: number;
+  submitted: number;
+  assignments: Array<{ id: string; status: AssignmentStatus; recusalReason: string | null; batchId: string | null; judge: { id: string; name: string }; conflict: boolean }>;
+};
+export type AssignmentsOverview = { submissionsClosed: boolean; hasRubric: boolean; projects: CoverageRow[] };
+export type Batch = { id: string; name: string; algorithm: string; params: Record<string, unknown>; seed: number | null; createdAt: string; createdBy: { name: string } | null; assignments: number };

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarClock, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Palette, Scale, UserCog } from "lucide-react";
+import { CalendarClock, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
 
 const GROUPS = [
   {
@@ -22,6 +22,7 @@ const GROUPS = [
     items: [
       { path: "/rubric", label: "Rubric", icon: Scale },
       { path: "/judges", label: "Judges", icon: Gavel },
+      { path: "/assignments", label: "Assignments", icon: Network },
     ],
   },
 ];
