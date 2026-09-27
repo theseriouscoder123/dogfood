@@ -141,7 +141,7 @@ export function votingWindow(event: { votingOpensAt: Date | null; votingClosesAt
 
 export type VoterIdentity =
   | { kind: "none" }
-  | { kind: "user"; emailVerified: boolean; domainAllowed: boolean }
+  | { kind: "user"; emailVerified: boolean; domainAllowed: boolean; disposable?: boolean }
   | { kind: "invite" };
 
 /**
@@ -158,6 +158,7 @@ export function decideVote(a: EventAccess, window: VotingWindow, mode: "email" |
   if (mode === "invite") return id.kind === "invite" ? "allow" : "invite_required";
   if (id.kind !== "user") return "unauthenticated";
   if (!id.domainAllowed) return "domain_not_allowed";
+  if (id.disposable) return "disposable_email";
   if (mode === "email" && !id.emailVerified) return "email_unverified";
   return "allow";
 }
@@ -178,7 +179,9 @@ export type Outcome =
   | "staff_cannot_vote"
   | "invite_required"
   | "domain_not_allowed"
-  | "email_unverified";
+  | "email_unverified"
+  | "disposable_email"
+  | "rate_limited";
 
 const refusals: Record<Exclude<Outcome, "allow">, () => HttpError> = {
   unauthenticated,
@@ -198,6 +201,8 @@ const refusals: Record<Exclude<Outcome, "allow">, () => HttpError> = {
   invite_required: () => new HttpError(403, "invite_required", "Voting in this event needs a ballot code from the organizers."),
   domain_not_allowed: () => new HttpError(403, "domain_not_allowed", "Voting is limited to email addresses from the organizers' allowed domains."),
   email_unverified: () => new HttpError(403, "email_unverified", "Confirm your email first: we'll send you a one-time voting link."),
+  disposable_email: () => new HttpError(403, "disposable_email", "Throwaway email addresses can't vote. Use an address you keep."),
+  rate_limited: () => new HttpError(429, "rate_limited", "Too many ballots from this network in the last hour. Try again later."),
 };
 
 /** Turn a decision into the matching HTTP error. */

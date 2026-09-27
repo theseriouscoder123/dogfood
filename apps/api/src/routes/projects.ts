@@ -10,6 +10,7 @@ import {
   enforce,
   submissionWindow,
 } from "../policy";
+import { recordProjectView } from "./voting";
 import { appendAudit, audit, fromRequest } from "../audit";
 import { eventBySlug } from "../lib/events";
 import { HttpError, notFound } from "../lib/http";
@@ -196,6 +197,7 @@ projectsRouter.get("/:projectId", async (req, res) => {
       team: { select: { id: true, name: true, members: { orderBy: { joinedAt: "asc" }, select: { role: true, user: { select: { name: true } } } } } },
     },
   });
+  if (full.status === "submitted") await recordProjectView(req, event, full.id);
   const window = submissionWindow(event);
   const privileged = isTeamMember || !!access.actor?.isAdmin || access.roles.has("organizer");
   const questions = await prisma.submissionQuestion.findMany({

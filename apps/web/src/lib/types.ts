@@ -421,7 +421,8 @@ export type VoteStatus =
   | "invite_required"
   | "domain_not_allowed"
   | "staff_cannot_vote"
-  | "duplicate_inbox";
+  | "duplicate_inbox"
+  | "disposable_email";
 export type BallotProject = {
   id: string;
   title: string;
@@ -453,4 +454,23 @@ export type VotingAdmin = {
   turnout: { voters: number; byKind: Partial<Record<VotingMode, number>>; ballots: number; choices: number; lastBallotAt: string | null };
   locked: boolean;
   invites: Array<{ label: string; total: number; redeemed: number; revoked: number; createdAt: string }>;
+};
+
+export type VoteSignalType = "shared_network" | "identical_ballots" | "fresh_accounts" | "address_pattern" | "surge" | "blind_votes";
+export type VoteBallotSample = { ballotId: string; voter: string; network: string | null; castAt: string; accountAgeMinutes: number | null; quarantined: boolean };
+export type VoteIncident = {
+  key: string;
+  severity: "high" | "medium" | "low";
+  signals: Array<{ type: VoteSignalType; summary: string; evidence: Record<string, unknown> }>;
+  ballotIds: string[];
+  quarantined: number;
+  projects: Array<{ id: string; title: string }>;
+  sample: VoteBallotSample[];
+  resolution: { status: string; note: string; by: string | null; at: string } | null;
+};
+export type VoteReview = {
+  window: VotingWindow;
+  summary: { ballots: number; quarantined: number; incidents: number; open: number };
+  incidents: VoteIncident[];
+  quarantinedBallots: Array<VoteBallotSample & { reason: string | null }>;
 };

@@ -7,6 +7,7 @@ import { audit, fromRequest } from "../audit";
 import { HttpError } from "../lib/http";
 import { randomToken, sha256 } from "../lib/crypto";
 import { absoluteUrl, sendMail } from "../lib/mail";
+import { isDisposableEmail } from "../voting/disposable";
 
 export const authRouter = Router();
 
@@ -145,6 +146,8 @@ authRouter.post("/link", async (req, res) => {
     throw new HttpError(429, "too_many_links", "Too many sign-in links from this network. Try again in an hour.");
 
   const next = safeNext(body.next);
+  if (/^\/events\/[\w-]+\/vote/.test(next) && isDisposableEmail(body.email))
+    throw new HttpError(400, "disposable_email", "Throwaway email addresses can't vote. Use an address you keep.");
   // Past the per-inbox limit we quietly send nothing: same answer either way.
   if ((await prisma.loginLink.count({ where: { email: body.email, createdAt: { gt: hourAgo } } })) < LINKS_PER_EMAIL_PER_HOUR) {
     const token = randomToken();

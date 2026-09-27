@@ -24,11 +24,33 @@ import { HttpError } from "../lib/http";
 import { config } from "../config";
 import { randomToken, sha256 } from "../lib/crypto";
 import { ballotOrder, canonicalCode, emailDomainAllowed, makeInviteCode, makeReceipt, normalizeEmail } from "../voting/core";
+import { isDisposableEmail } from "../voting/disposable";
+import { detectSignals, groupIncidents, subnetOf, type AbuseBallot } from "../voting/abuse";
 
 export const votingRouter = Router({ mergeParams: true });
 
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 const REDEEM_FAILURES_PER_IP_PER_HOUR = 20;
+// Generous on purpose: a venue's whole audience can share one public IP. The limits stop scripts;
+// the review queue deals with humans.
+const NEW_BALLOTS_PER_IP_PER_HOUR = 60;
+const CHANGES_PER_BALLOT_PER_HOUR = 30;
+
+/**
+ * Remember that this voter opened this project while voting is open ("viewed before voted" is
+ * one of the anti-abuse signals). Called from the project page's API; never fails the page.
+ */
+export async function recordProjectView(req: Request, event: Event, projectId: string) {
+  if (votingWindow(event) !== "open") return;
+  try {
+    const r = await resolveVoter(req, event);
+    if (!r.identityKey) return;
+    await prisma.projectView.createMany({ data: [{ eventId: event.id, projectId, viewerKey: r.identityKey }], skipDuplicates: true });
+  } catch (err) {
+    console.error("[voting] could not record a project view:", (err as Error).message);
+  }
+}
 
 async function staffEvent(req: Request) {
   const event = await eventBySlug((req.params as { slug?: string }).slug);
@@ -60,7 +82,7 @@ async function resolveVoter(req: Request, event: Event): Promise<Resolved> {
   if (!req.actor) return { identity: { kind: "none" }, identityKey: null, emailKey: null, userId: null, inviteVoterId: null, email: null };
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.actor.id }, select: { id: true, email: true, emailVerifiedAt: true } });
   return {
-    identity: { kind: "user", emailVerified: user.emailVerifiedAt !== null, domainAllowed: emailDomainAllowed(user.email, event.voterDomains) },
+    identity: { kind: "user", emailVerified: user.emailVerifiedAt !== null, domainAllowed: emailDomainAllowed(user.email, event.voterDomains), disposable: isDisposableEmail(user.email) },
     identityKey: `user:${user.id}`,
     emailKey: normalizeEmail(user.email),
     userId: user.id,
@@ -189,6 +211,18 @@ votingRouter.put("/ballot", async (req, res) => {
   const position = new Map(order.map((id, i) => [id, i]));
   const ip = req.ip ?? null;
   const userAgent = req.get("user-agent")?.slice(0, 300) ?? null;
+
+  // Rate limits: a flood of new ballots from one network, or one ballot flipped over and over.
+  const hourAgo = new Date(Date.now() - HOUR);
+  const mine = r.identityKey
+    ? await prisma.ballot.findFirst({ where: { eventId: event.id, voter: { identityKey: r.identityKey } }, select: { id: true } })
+    : null;
+  if (!mine && ip && (await prisma.ballot.count({ where: { eventId: event.id, ip, createdAt: { gt: hourAgo } } })) >= NEW_BALLOTS_PER_IP_PER_HOUR) {
+    await audit({ ...fromRequest(req), eventId: event.id, action: "vote.rate_limited", entityType: "Event", entityId: event.id, after: { reason: "new_ballots_per_ip" } });
+    enforce("rate_limited");
+  }
+  if (mine && (await prisma.auditLog.count({ where: { eventId: event.id, action: "ballot.changed", entityId: mine.id, createdAt: { gt: hourAgo } } })) >= CHANGES_PER_BALLOT_PER_HOUR)
+    throw new HttpError(429, "too_many_changes", "You've changed your ballot a lot in the last hour. Take a break and try again later.");
 
   try {
     const ballot = await prisma.$transaction(async (tx) => {
@@ -324,4 +358,160 @@ votingRouter.post("/voting/invites/revoke", async (req, res) => {
     return r;
   });
   res.json({ revoked: result.count });
+});
+
+// ── anti-abuse review ───────────────────────────────────────────────────────
+//
+//   GET  /voting/review              incidents (merged signals), quarantined ballots
+//   POST /voting/review/quarantine   set ballots aside, with a reason (kept, not counted)
+//   POST /voting/review/restore      count them again, with a reason
+//   POST /voting/review/resolve      "looks fine" (with a note) or reopen an incident
+//
+// Deliberate, limited disclosure: an incident names the project its ballots backed, because an
+// organizer can't judge a brigade without knowing who it helps. No other per-project numbers
+// are shown, and every decision is audited.
+
+/** d***7@outlook.com: enough for an organizer to see a pattern, not a mailing list. */
+export const maskEmail = (email: string) => {
+  const [local = "", domain = ""] = email.split(/@(?=[^@]*$)/);
+  return local.length <= 2 ? `${local[0] ?? ""}*@${domain}` : `${local[0]}***${local.at(-1)}@${domain}`;
+};
+
+async function loadAbuseBallots(eventId: string) {
+  const [ballots, views] = await Promise.all([
+    prisma.ballot.findMany({
+      where: { eventId },
+      select: {
+        id: true, receipt: true, status: true, quarantineReason: true, ip: true, createdAt: true,
+        choices: { select: { projectId: true } },
+        voter: { select: { identityKey: true, kind: true, user: { select: { email: true, createdAt: true } } } },
+      },
+    }),
+    prisma.projectView.findMany({ where: { eventId }, select: { viewerKey: true, projectId: true } }),
+  ]);
+  const viewed = new Map<string, string[]>();
+  for (const v of views) viewed.set(v.viewerKey, [...(viewed.get(v.viewerKey) ?? []), v.projectId]);
+  return ballots.map((b) => ({
+    row: b,
+    input: {
+      ballotId: b.id,
+      email: b.voter.user?.email ?? null,
+      accountCreatedAt: b.voter.user?.createdAt ?? null,
+      castAt: b.createdAt,
+      ip: b.ip,
+      choices: b.choices.map((c) => c.projectId),
+      viewed: viewed.get(b.voter.identityKey) ?? [],
+      quarantined: b.status === "quarantined",
+    } satisfies AbuseBallot,
+  }));
+}
+
+votingRouter.get("/voting/review", async (req, res) => {
+  const event = await staffEvent(req);
+  const [loaded, resolutions, projects] = await Promise.all([
+    loadAbuseBallots(event.id),
+    prisma.integrityResolution.findMany({ where: { eventId: event.id, flagKey: { startsWith: "vote:" } }, include: { resolvedBy: { select: { name: true } } } }),
+    prisma.project.findMany({ where: { eventId: event.id }, select: { id: true, title: true } }),
+  ]);
+  const incidents = groupIncidents(detectSignals(loaded.map((l) => l.input)));
+  const byId = new Map(loaded.map((l) => [l.row.id, l]));
+  const title = new Map(projects.map((p) => [p.id, p.title]));
+  const decided = new Map(resolutions.map((r) => [r.flagKey.slice(5), r]));
+  const describe = (id: string) => {
+    const l = byId.get(id)!;
+    const u = l.row.voter.user;
+    return {
+      ballotId: id,
+      voter: u ? maskEmail(u.email) : "ballot code",
+      network: subnetOf(l.row.ip),
+      castAt: l.row.createdAt,
+      accountAgeMinutes: u ? Math.round((l.row.createdAt.getTime() - u.createdAt.getTime()) / 60_000) : null,
+      quarantined: l.row.status === "quarantined",
+    };
+  };
+
+  res.json({
+    window: votingWindow(event),
+    summary: {
+      ballots: loaded.filter((l) => l.input.choices.length > 0).length,
+      quarantined: loaded.filter((l) => l.row.status === "quarantined").length,
+      incidents: incidents.length,
+      open: incidents.filter((i) => !decided.has(i.key) && i.ballotIds.some((id) => byId.get(id)!.row.status !== "quarantined")).length,
+    },
+    incidents: incidents.map((i) => {
+      const d = decided.get(i.key);
+      return {
+        key: i.key,
+        severity: i.severity,
+        signals: i.signals.map((s) => ({ type: s.type, summary: s.summary, evidence: s.evidence })),
+        ballotIds: i.ballotIds,
+        quarantined: i.ballotIds.filter((id) => byId.get(id)!.row.status === "quarantined").length,
+        projects: i.projectIds.map((id) => ({ id, title: title.get(id) ?? "?" })),
+        sample: i.ballotIds.slice(0, 12).map(describe),
+        resolution: d ? { status: d.status, note: d.note, by: d.resolvedBy?.name ?? null, at: d.resolvedAt } : null,
+      };
+    }),
+    quarantinedBallots: loaded
+      .filter((l) => l.row.status === "quarantined")
+      .map((l) => ({ ...describe(l.row.id), reason: l.row.quarantineReason }))
+      .sort((a, b) => a.castAt.getTime() - b.castAt.getTime()),
+  });
+});
+
+const Ids = z.array(z.uuid()).min(1).max(2000);
+
+votingRouter.post("/voting/review/quarantine", async (req, res) => {
+  const event = await staffEvent(req);
+  const body = z
+    .object({ ballotIds: Ids, reason: z.string().trim().min(5, "Say why (at least 5 characters).").max(500), incidentKey: z.string().max(300).optional() })
+    .parse(req.body);
+  const result = await prisma.$transaction(async (tx) => {
+    const r = await tx.ballot.updateMany({ where: { eventId: event.id, id: { in: body.ballotIds }, status: "counted" }, data: { status: "quarantined", quarantineReason: body.reason } });
+    await appendAudit(tx, {
+      ...fromRequest(req), eventId: event.id, action: "ballots.quarantined", entityType: "Event", entityId: event.id,
+      after: { count: r.count, reason: body.reason, incidentKey: body.incidentKey ?? null, ballotIds: body.ballotIds },
+    });
+    return r;
+  });
+  res.json({ quarantined: result.count });
+});
+
+votingRouter.post("/voting/review/restore", async (req, res) => {
+  const event = await staffEvent(req);
+  const body = z.object({ ballotIds: Ids, reason: z.string().trim().min(5, "Say why (at least 5 characters).").max(500) }).parse(req.body);
+  const result = await prisma.$transaction(async (tx) => {
+    const r = await tx.ballot.updateMany({ where: { eventId: event.id, id: { in: body.ballotIds }, status: "quarantined" }, data: { status: "counted", quarantineReason: null } });
+    await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "ballots.restored", entityType: "Event", entityId: event.id, after: { count: r.count, reason: body.reason, ballotIds: body.ballotIds } });
+    return r;
+  });
+  res.json({ restored: result.count });
+});
+
+votingRouter.post("/voting/review/resolve", async (req, res) => {
+  const event = await staffEvent(req);
+  const body = z.object({ incidentKey: z.string().min(1).max(300), status: z.enum(["dismissed", "open"]), note: z.string().trim().max(1000).default("") }).parse(req.body);
+  const flagKey = `vote:${body.incidentKey}`;
+  if (body.status === "open") {
+    const existing = await prisma.integrityResolution.findUnique({ where: { eventId_flagKey: { eventId: event.id, flagKey } } });
+    if (!existing) throw new HttpError(404, "not_resolved", "That incident has no decision to undo.");
+    await prisma.$transaction(async (tx) => {
+      await tx.integrityResolution.delete({ where: { eventId_flagKey: { eventId: event.id, flagKey } } });
+      await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "vote_incident.reopened", entityType: "VoteIncident", entityId: body.incidentKey, before: { note: existing.note } });
+    });
+    res.json({ resolution: null });
+    return;
+  }
+  if (body.note.length < 3) throw new HttpError(400, "note_required", "Say why this looks fine, so the next person reading it knows.");
+  const loaded = await loadAbuseBallots(event.id);
+  if (!groupIncidents(detectSignals(loaded.map((l) => l.input))).some((i) => i.key === body.incidentKey))
+    throw new HttpError(404, "incident_not_found", "That incident no longer applies to the current ballots.");
+  await prisma.$transaction(async (tx) => {
+    await tx.integrityResolution.upsert({
+      where: { eventId_flagKey: { eventId: event.id, flagKey } },
+      create: { eventId: event.id, flagKey, status: "dismissed", note: body.note, resolvedById: req.actor!.id },
+      update: { status: "dismissed", note: body.note, resolvedById: req.actor!.id, resolvedAt: new Date() },
+    });
+    await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "vote_incident.dismissed", entityType: "VoteIncident", entityId: body.incidentKey, after: { note: body.note } });
+  });
+  res.json({ resolution: { status: "dismissed", note: body.note } });
 });

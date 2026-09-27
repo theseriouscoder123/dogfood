@@ -88,3 +88,12 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - Link requests are limited to 5 per inbox per hour (silently) and 20 per IP per hour.
   - Wrong ballot codes are audited and rate-limited per IP.
 - **Sun** On phones, the ballot summary (votes left, receipt) was below 15 project cards. It now comes first.
+- **Sun · T3 phase 2 (anti-abuse)** Six detection signals, each deliberately weak on its own: same /24 network, identical ballots in a burst, accounts made minutes before voting, numbered addresses, a sudden surge, and votes for projects the voter never opened (recorded with a new `ProjectView` table). Signals that point at mostly the same ballots merge into one **incident**, whose severity is the number of *independent* kinds of evidence (3+ high, 2 medium, 1 low). A campus class voting together scores low; a stuffing ring scores high. Nothing is removed automatically: organizers quarantine (with a reason; the ballots are kept and simply not counted) or mark an incident as fine, and every decision is audited.
+- **Sun** Tuning lessons:
+  - The first "voted without looking" rule needed 60% of a project's votes to be blind. A ring voting for a project that also has real fans fell just short (12 of 22). The rule now compares against the event's own blind-vote rate on other projects: at least 40%, and at least twice the baseline.
+  - The seeded fans were called `fan01..34@`, and the numbered-address check flagged them all. That was the check working, so the seed now uses realistic addresses.
+- **Sun** Prevention:
+  - A bundled list of throwaway email providers (works offline) blocks both the voting link and the ballot.
+  - Rate limits allow 60 new ballots per network per hour (generous, because a venue's whole audience can share one IP) and 30 changes per ballot per hour.
+  - The review screen masks emails (`d***7@outlook.com`). It names the project a flagged group backed, a deliberate limited disclosure: you can't judge a brigade without knowing who it helps.
+- **Sun** Demo seed: 34 ordinary fans, a class of 6 from one campus (low severity), and a ring of 12 `dev.hunter01..12@outlook.com` accounts backing Portly (high severity, all six signals). The review queue finds exactly those two incidents and flags none of the fans.

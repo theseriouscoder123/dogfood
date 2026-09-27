@@ -304,6 +304,7 @@ model Project {
   results       ProjectResult[]
   answers       ProjectAnswer[]
   ballotChoices BallotChoice[]
+  views         ProjectView[]
 
   @@unique([eventId, externalId])
   @@unique([id, eventId])
@@ -669,4 +670,19 @@ model BallotChoice {
 
   @@id([ballotId, projectId])
   @@index([projectId])
+}
+
+// First time each voter opened each project page while voting was open. Lets the anti-abuse
+// review spot "blind" votes: a surge of votes for a project its voters never looked at is what
+// a "just click this link and vote for us" campaign looks like.
+model ProjectView {
+  eventId       String   @db.Uuid
+  projectId     String   @db.Uuid
+  viewerKey     String // the voter's identityKey: "user:<id>" or "invite:<id>"
+  firstViewedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, viewerKey])
+  @@index([eventId, viewerKey])
 }

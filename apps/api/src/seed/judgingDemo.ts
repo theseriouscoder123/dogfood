@@ -148,7 +148,7 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
 
       // Participants, teams and submitted projects.
       let person = 0;
-      const projects = [];
+      const projects: Array<{ id: string; title: string; trackId: string | null; teamId: string; quality: number }> = [];
       for (const [i, [title, tagline, track, tech, quality]] of PROJECTS.entries()) {
         const size = 1 + (i % 3);
         const members = [];
@@ -259,31 +259,77 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
         }
       }
 
-      // Community voters: people who confirmed their email and picked up to 3 favourites. Taste
-      // follows project quality loosely, and each ballot is cast through the same shuffled order
-      // a real voter sees, so the stored positions are genuine.
+      // Community voters. Three kinds, so the anti-abuse review has something real to do:
+      //   34 ordinary fans: old accounts, their own networks, spread over two days, and they
+      //      opened the projects they voted for;
+      //   6 students voting together from one campus network: flagged, but only as low severity,
+      //      which an organizer should look at and mark as fine;
+      //   12 throwaway accounts (dev.hunter01..12@outlook.com), created minutes before voting, on
+      //      one /24, all backing Portly within four minutes, none of them having opened it:
+      //      six independent signals, one high-severity incident.
+      // Every ballot is cast through the same shuffled order a real voter sees.
       const ballotIds = projects.map((p) => p.id);
+      const FIRST = ["maya", "leo", "ines", "omar", "zoe", "ravi", "nora", "felix", "aiko", "sam", "tara", "yusuf", "lena", "diego", "chloe", "arjun", "mira"];
+      const LAST = ["okafor", "berg", "silva", "khan", "moreau", "tanaka", "novak", "reyes", "lund", "patel", "cho", "haddad"];
+      const DOMAINS = ["gmail.com", "outlook.com", "proton.me", "fastmail.com", "hey.com", "icloud.com"];
       let ballots = 0;
-      for (let v = 0; v < 34; v++) {
-        const email = `fan${String(v + 1).padStart(2, "0")}@community.example.org`;
-        const user = await tx.user.upsert({
-          where: { email },
-          update: {},
-          create: { email, name: `${PEOPLE[(v * 7) % PEOPLE.length]!.split(" ")[0]} (community)`, emailVerifiedAt: judgingOpens, passwordHash: demoPasswordHash },
-        });
+      const castBallot = async (o: { email: string; name: string; accountAt: Date; castAt: Date; ip: string; picks: string[]; viewed: string[] }) => {
+        const user = await tx.user.upsert({ where: { email: o.email }, update: {}, create: { email: o.email, name: o.name, emailVerifiedAt: o.accountAt, passwordHash: demoPasswordHash, createdAt: o.accountAt } });
         const identityKey = `user:${user.id}`;
         const order = ballotOrder(ballotIds, `${e.id}:${identityKey}`);
-        const appeal = projects.map((p) => ({ id: p.id, w: p.quality + between(-0.35, 0.35) })).sort((a, b) => b.w - a.w);
-        const picks = appeal.slice(0, 1 + (v % 3)).map((x) => x.id);
-        const castAt = new Date(judgingOpens.getTime() + between(0.5, 44) * 3_600_000);
-        const voter = await tx.voter.create({
-          data: { eventId: e.id, kind: "email", userId: user.id, identityKey, emailKey: normalizeEmail(email), ip: `203.0.113.${10 + v}`, userAgent: "Mozilla/5.0 (seed)", createdAt: castAt },
-        });
-        const ballot = await tx.ballot.create({
-          data: { eventId: e.id, voterId: voter.id, receipt: makeReceipt(), ip: voter.ip, userAgent: voter.userAgent, createdAt: castAt, updatedAt: castAt },
-        });
-        await tx.ballotChoice.createMany({ data: picks.map((projectId) => ({ ballotId: ballot.id, projectId, position: order.indexOf(projectId), createdAt: castAt })) });
+        const voter = await tx.voter.create({ data: { eventId: e.id, kind: "email", userId: user.id, identityKey, emailKey: normalizeEmail(o.email), ip: o.ip, userAgent: "Mozilla/5.0 (seed)", createdAt: o.castAt } });
+        const ballot = await tx.ballot.create({ data: { eventId: e.id, voterId: voter.id, receipt: makeReceipt(), ip: o.ip, userAgent: voter.userAgent, createdAt: o.castAt, updatedAt: o.castAt } });
+        await tx.ballotChoice.createMany({ data: o.picks.map((projectId) => ({ ballotId: ballot.id, projectId, position: order.indexOf(projectId), createdAt: o.castAt })) });
+        if (o.viewed.length)
+          await tx.projectView.createMany({ data: o.viewed.map((projectId) => ({ eventId: e.id, projectId, viewerKey: identityKey, firstViewedAt: new Date(o.castAt.getTime() - 5 * MIN) })), skipDuplicates: true });
         ballots++;
+      };
+      const appealPicks = (n: number) => projects.map((p) => ({ id: p.id, w: p.quality + between(-0.35, 0.35) })).sort((a, b) => b.w - a.w).slice(0, n).map((x) => x.id);
+      const alsoLooked = () => projects.filter(() => random() < 0.25).map((p) => p.id);
+
+      for (let v = 0; v < 34; v++) {
+        const first = FIRST[v % FIRST.length]!;
+        const last = LAST[(v * 5) % LAST.length]!;
+        const picks = appealPicks(1 + (v % 3));
+        await castBallot({
+          email: `${first}.${last}@${DOMAINS[v % DOMAINS.length]}`,
+          name: `${first[0]!.toUpperCase()}${first.slice(1)} ${last[0]!.toUpperCase()}${last.slice(1)}`,
+          accountAt: new Date(judgingOpens.getTime() - between(5, 400) * DAY / 10),
+          castAt: new Date(judgingOpens.getTime() + between(0.5, 44) * 3_600_000),
+          ip: `100.64.${10 + v * 3}.${20 + v}`,
+          picks,
+          viewed: [...picks, ...alsoLooked()],
+        });
+      }
+
+      const campusAt = judgingOpens.getTime() + 20 * 3_600_000;
+      for (let v = 0; v < 6; v++) {
+        const first = FIRST[(v * 3 + 1) % FIRST.length]!;
+        const picks = appealPicks(3).slice(v % 2, (v % 2) + 1 + (v % 3));
+        await castBallot({
+          email: `${first}.${LAST[(v + 7) % LAST.length]}@students.uni.example.edu`,
+          name: `${first[0]!.toUpperCase()}${first.slice(1)} (student)`,
+          accountAt: new Date(campusAt - between(20, 90) * DAY),
+          castAt: new Date(campusAt + v * 4 * MIN + between(0, 2) * MIN),
+          ip: `192.0.2.${30 + v * 7}`,
+          picks,
+          viewed: [...picks, ...alsoLooked()],
+        });
+      }
+
+      const portly = projects.find((p) => p.title === "Portly")!.id;
+      const ringAt = Math.min(now - 5 * 3_600_000, judgingOpens.getTime() + 30 * 3_600_000);
+      for (let v = 0; v < 12; v++) {
+        const castAt = new Date(ringAt + v * 20_000);
+        await castBallot({
+          email: `dev.hunter${String(v + 1).padStart(2, "0")}@outlook.com`,
+          name: `Dev Hunter ${v + 1}`,
+          accountAt: new Date(castAt.getTime() - between(1, 3) * MIN),
+          castAt,
+          ip: `203.0.113.${40 + v}`,
+          picks: [portly],
+          viewed: [],
+        });
       }
       // A verified voter who hasn't voted yet, for trying the ballot live (Cookie: sid=seed-voter).
       await tx.user.upsert({

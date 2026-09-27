@@ -125,6 +125,8 @@ function Gate({ slug, data, loggedInEmail, code }: { slug: string; data: VoteVie
     return card(<UserCheck className="size-5" />, "Organizers and judges don't vote here", "You already have your own say in the results, so the community vote is left to everyone else.");
   if (data.status === "domain_not_allowed")
     return card(<Mail className="size-5" />, "This vote is limited to certain email domains", <>Voting is open to addresses at {data.voterDomains.map((d) => `@${d}`).join(", ")}. Sign in with one of those to vote.</>);
+  if (data.status === "disposable_email")
+    return card(<Mail className="size-5" />, "Throwaway addresses can't vote", "Temporary inboxes make it too easy to vote many times. Sign in with an email address you keep.");
   if (data.status === "duplicate_inbox")
     return card(<Mail className="size-5" />, "This inbox has already voted", "Another account using the same email inbox already holds a ballot in this event. One inbox, one ballot.");
 
