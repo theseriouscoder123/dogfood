@@ -5,7 +5,7 @@ import { buttonClass, Card } from "@/components/ui";
 
 export const metadata = { title: "Exports" };
 
-const STAGES = ["Registration", "Submissions", "Judging", "Results", "Record"];
+const STAGES = ["Registration", "Submissions", "Judging", "Results", "Community", "Record"];
 
 export default async function ExportsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

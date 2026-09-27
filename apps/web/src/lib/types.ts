@@ -474,3 +474,34 @@ export type VoteReview = {
   incidents: VoteIncident[];
   quarantinedBallots: Array<VoteBallotSample & { reason: string | null }>;
 };
+
+export type CommentsMode = "open" | "read_only" | "off";
+export type CommentView = {
+  id: string;
+  state: "visible" | "hidden" | "deleted";
+  body: string | null;
+  author: { name: string; badges: Array<"team" | "organizer"> } | null;
+  createdAt: string;
+  editedAt: string | null;
+  mine: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canReport: boolean;
+  reportedByMe: boolean;
+};
+export type CommentThreadView = CommentView & { replies: CommentView[] };
+export type CommentsResponse = { mode: CommentsMode; canComment: boolean; reason: string | null; count: number; threads: CommentThreadView[] };
+export type ModerationItem = {
+  id: string;
+  body: string;
+  project: { id: string; title: string };
+  isReply: boolean;
+  author: { name: string; email: string; accountAgeDays: number };
+  createdAt: string;
+  editedAt: string | null;
+  deleted: boolean;
+  hidden: { at: string; by: string | null; auto: boolean; reason: string | null } | null;
+  openReports: Array<{ reason: "spam" | "abuse" | "off_topic" | "other"; note: string; at: string; by: string }>;
+  totalReports: number;
+};
+export type ModerationQueue = { mode: CommentsMode; counts: { reported: number; hidden: number; total: number }; items: ModerationItem[] };

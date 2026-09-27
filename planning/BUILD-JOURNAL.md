@@ -97,3 +97,15 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - Rate limits allow 60 new ballots per network per hour (generous, because a venue's whole audience can share one IP) and 30 changes per ballot per hour.
   - The review screen masks emails (`d***7@outlook.com`). It names the project a flagged group backed, a deliberate limited disclosure: you can't judge a brigade without knowing who it helps.
 - **Sun** Demo seed: 34 ordinary fans, a class of 6 from one campus (low severity), and a ring of 12 `dev.hunter01..12@outlook.com` accounts backing Portly (high severity, all six signals). The review queue finds exactly those two incidents and flags none of the fans.
+- **Sun · T3 phase 3 (comments)** Project comments are plain text, stored exactly as typed and rendered as text nodes and `<a>` elements, so there's no HTML to sanitize (a test posts `<script>` and `<img onerror>` payloads). Links get `rel="nofollow ugc noopener"`.
+  - **Replies:** one level deep, enforced by a DB trigger.
+  - **Badges:** Team and Organizer.
+  - **Authors:** can edit for 15 minutes, with the previous text kept in the audit log so an edit can't quietly rewrite a conversation, and can delete any time. The row is kept for moderation and a placeholder shows only if replies hang off it.
+- **Sun** Judges can't comment until judging closes: a judge's public remark could sway other judges and reads like a verdict. The judge console never shows comments or votes.
+- **Sun** Spam guards:
+  - brand-new accounts (under a day old) can't post links
+  - the same comment twice (ignoring case and punctuation) is refused
+  - at most 5 comments per 10 minutes and 30 per day
+
+  Three reports from established accounts hide a comment automatically, pending review. Reports from throwaway accounts don't count, so a handful of fresh accounts can't silence someone. Organizers hide with a reason, restore, or dismiss wrong reports, which also undoes an automatic hide. The event can set comments to open, read-only or off. `comments.csv` joins the exports.
+- **Sun** Seeded discussion: questions answered by the teams, a link from an established fan, and the ring's "VOTE PORTLY!!!" spam with two reports in the moderation queue. The demo story links up: the same accounts show up in Vote review *and* in comment moderation.

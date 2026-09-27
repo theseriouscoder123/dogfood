@@ -157,7 +157,7 @@ describe("redistribution", () => {
 });
 
 describe("CSV exports", () => {
-  const FILES = ["participants.csv", "teams.csv", "projects.csv", "judges.csv", "assignments.csv", "reviews.csv", "results.csv", "audit.csv"];
+  const FILES = ["participants.csv", "teams.csv", "projects.csv", "judges.csv", "assignments.csv", "reviews.csv", "results.csv", "comments.csv", "audit.csv"];
 
   it("lists every stage with row counts, and each file downloads as CSV", async () => {
     const s = await setup();

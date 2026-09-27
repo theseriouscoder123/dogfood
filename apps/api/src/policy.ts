@@ -163,6 +163,21 @@ export function decideVote(a: EventAccess, window: VotingWindow, mode: "email" |
   return "allow";
 }
 
+export type CommentsMode = "open" | "read_only" | "off";
+
+/**
+ * Posting a comment. Judges wait until judging has closed: a judge's public remark about a
+ * project could sway other judges and looks like a verdict before the results. Everyone else
+ * who is signed in can comment while the event allows it.
+ */
+export function decideComment(a: EventAccess, mode: CommentsMode, judging: JudgingWindow): Outcome {
+  if (mode === "off") return "comments_off";
+  if (mode === "read_only") return "comments_read_only";
+  if (!a.actor) return "unauthenticated";
+  if (a.roles.has("judge") && !a.roles.has("organizer") && judging !== "closed") return "judge_cannot_comment";
+  return "allow";
+}
+
 export type Outcome =
   | Decision
   | "closed"
@@ -181,7 +196,10 @@ export type Outcome =
   | "domain_not_allowed"
   | "email_unverified"
   | "disposable_email"
-  | "rate_limited";
+  | "rate_limited"
+  | "comments_off"
+  | "comments_read_only"
+  | "judge_cannot_comment";
 
 const refusals: Record<Exclude<Outcome, "allow">, () => HttpError> = {
   unauthenticated,
@@ -203,6 +221,9 @@ const refusals: Record<Exclude<Outcome, "allow">, () => HttpError> = {
   email_unverified: () => new HttpError(403, "email_unverified", "Confirm your email first: we'll send you a one-time voting link."),
   disposable_email: () => new HttpError(403, "disposable_email", "Throwaway email addresses can't vote. Use an address you keep."),
   rate_limited: () => new HttpError(429, "rate_limited", "Too many ballots from this network in the last hour. Try again later."),
+  comments_off: () => new HttpError(404, "comments_off", "Comments are turned off for this event."),
+  comments_read_only: () => new HttpError(403, "comments_read_only", "Comments are closed for this event; existing ones stay visible."),
+  judge_cannot_comment: () => new HttpError(403, "judge_cannot_comment", "Judges can comment once judging has closed, so a public remark can't sway the scoring."),
 };
 
 /** Turn a decision into the matching HTTP error. */

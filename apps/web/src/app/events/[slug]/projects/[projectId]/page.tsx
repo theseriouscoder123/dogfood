@@ -3,20 +3,23 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CheckSquare, ExternalLink, Lock, Pencil, PlayCircle, Square } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { getEvent } from "@/lib/data";
-import type { ProjectDetail } from "@/lib/types";
+import type { CommentsResponse, ProjectDetail } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { Markdown } from "@/components/Markdown";
+import { CommentThread } from "@/components/CommentThread";
 import { Avatar, Cover, LogoTile } from "@/components/visuals";
 import { buttonClass, Card, GithubIcon, Pill } from "@/components/ui";
 
 export default async function ProjectPage({ params }: { params: Promise<{ slug: string; projectId: string }> }) {
   const { slug, projectId } = await params;
-  const [detail, { event }] = await Promise.all([
+  const [detail, { event }, comments] = await Promise.all([
     api<ProjectDetail>(`/api/events/${encodeURIComponent(slug)}/projects/${encodeURIComponent(projectId)}`).catch((e: unknown) => {
       if (e instanceof ApiError && e.status === 404) notFound();
       throw e;
     }),
     getEvent(slug),
+    // Drafts and duplicates have no discussion; the API says so with a 404/409.
+    api<CommentsResponse>(`/api/events/${encodeURIComponent(slug)}/projects/${encodeURIComponent(projectId)}/comments`).catch(() => null),
   ]);
   const { project: p, canEdit, answers } = detail;
   const isGithub = p.repoUrl ? /github\.com/i.test(p.repoUrl) : false;
@@ -94,9 +97,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
               </dl>
             </Card>
           )}
+
+          {comments && <CommentThread slug={slug} projectId={p.id} initial={comments} />}
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <aside className="order-first space-y-4 lg:sticky lg:top-24 lg:order-none lg:self-start">
           {(p.demoUrl || p.repoUrl || p.videoUrl) && (
             <div className="space-y-2 rounded-2xl border border-line bg-surface p-4 shadow-card">
               {p.demoUrl && (

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, CalendarClock, Download, Heart, Medal, ShieldAlert, ShieldCheck, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
+import { Activity, CalendarClock, Download, Heart, Medal, MessageSquare, ShieldAlert, ShieldCheck, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
 
 const GROUPS = [
   {
@@ -33,6 +33,7 @@ const GROUPS = [
     items: [
       { path: "/voting", label: "Voting", icon: Heart },
       { path: "/vote-review", label: "Vote review", icon: ShieldAlert },
+      { path: "/comments", label: "Comments", icon: MessageSquare },
     ],
   },
   {

@@ -157,7 +157,7 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
           const email = slugEmail(name);
           members.push(await tx.user.upsert({ where: { email }, update: {}, create: { email, name, passwordHash: demoPasswordHash } }));
         }
-        const team = await tx.team.create({ data: { eventId: e.id, name: `Team ${title}`, createdById: members[0]!.id } });
+        const team = await tx.team.create({ data: { eventId: e.id, name: title, createdById: members[0]!.id } });
         for (const [m, u] of members.entries()) {
           await tx.eventRole.create({ data: { eventId: e.id, userId: u.id, role: "participant" } });
           await tx.teamMember.create({ data: { teamId: team.id, eventId: e.id, userId: u.id, role: m === 0 ? "captain" : "member" } });
@@ -283,15 +283,17 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
         if (o.viewed.length)
           await tx.projectView.createMany({ data: o.viewed.map((projectId) => ({ eventId: e.id, projectId, viewerKey: identityKey, firstViewedAt: new Date(o.castAt.getTime() - 5 * MIN) })), skipDuplicates: true });
         ballots++;
+        return user;
       };
       const appealPicks = (n: number) => projects.map((p) => ({ id: p.id, w: p.quality + between(-0.35, 0.35) })).sort((a, b) => b.w - a.w).slice(0, n).map((x) => x.id);
       const alsoLooked = () => projects.filter(() => random() < 0.25).map((p) => p.id);
 
+      const fans: Array<{ id: string; name: string }> = [];
       for (let v = 0; v < 34; v++) {
         const first = FIRST[v % FIRST.length]!;
         const last = LAST[(v * 5) % LAST.length]!;
         const picks = appealPicks(1 + (v % 3));
-        await castBallot({
+        const fan = await castBallot({
           email: `${first}.${last}@${DOMAINS[v % DOMAINS.length]}`,
           name: `${first[0]!.toUpperCase()}${first.slice(1)} ${last[0]!.toUpperCase()}${last.slice(1)}`,
           accountAt: new Date(judgingOpens.getTime() - between(5, 400) * DAY / 10),
@@ -300,6 +302,7 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
           picks,
           viewed: [...picks, ...alsoLooked()],
         });
+        fans.push(fan);
       }
 
       const campusAt = judgingOpens.getTime() + 20 * 3_600_000;
@@ -319,9 +322,10 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
 
       const portly = projects.find((p) => p.title === "Portly")!.id;
       const ringAt = Math.min(now - 5 * 3_600_000, judgingOpens.getTime() + 30 * 3_600_000);
+      const ring: Array<{ id: string; name: string }> = [];
       for (let v = 0; v < 12; v++) {
         const castAt = new Date(ringAt + v * 20_000);
-        await castBallot({
+        const member = await castBallot({
           email: `dev.hunter${String(v + 1).padStart(2, "0")}@outlook.com`,
           name: `Dev Hunter ${v + 1}`,
           accountAt: new Date(castAt.getTime() - between(1, 3) * MIN),
@@ -330,7 +334,28 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
           picks: [portly],
           viewed: [],
         });
+        ring.push(member);
       }
+
+      // A discussion: questions answered by the teams, a link from an established fan, and the
+      // ring's vote-begging spam on Portly, reported twice and waiting in the moderation queue.
+      const byTitle = new Map(projects.map((p) => [p.title, p]));
+      const captainOf = async (title: string) =>
+        (await tx.teamMember.findFirstOrThrow({ where: { teamId: byTitle.get(title)!.teamId, role: "captain" }, select: { userId: true } })).userId;
+      const say = async (title: string, authorId: string, body: string, hoursIn: number, parentId: string | null = null) =>
+        tx.comment.create({
+          data: { eventId: e.id, projectId: byTitle.get(title)!.id, authorId, parentId, body, createdAt: new Date(judgingOpens.getTime() + hoursIn * 3_600_000) },
+        });
+      const q1 = await say("Flakehunter", fans[0]!.id, "How do you decide a test is flaky rather than genuinely broken? Is it just re-running N times?", 3);
+      await say("Flakehunter", await captainOf("Flakehunter"), "Three re-runs on the same commit, plus a check that the failure isn't tied to the diff. The thresholds are configurable in flakehunter.toml.", 4.5, q1.id);
+      await say("Flakehunter", fans[4]!.id, "Ran it on our monorepo over lunch: it found 11 flaky tests we'd been ignoring for months. Great work.", 9);
+      const q2 = await say("GridPulse", fans[7]!.id, "Which grid-intensity data do you use offline? The demo seemed to work without a network.", 6);
+      await say("GridPulse", await captainOf("GridPulse"), "We ship a cached week of forecasts per region and refresh when online. Worst case you schedule on a day-old forecast.", 7.2, q2.id);
+      await say("Diffwise", fans[2]!.id, "The risk summary on our PR was spot on. For anyone curious, the write-up is at https://example.org/diffwise-notes", 12);
+      await say("Open Council", fans[10]!.id, "Would love a way to subscribe to a single agenda topic. Is that on the roadmap?", 15);
+      const spam = await say("Portly", ring[0]!.id, "VOTE PORTLY!!! best project here, everyone go vote now at portly-wins.xyz", 30.2);
+      for (const reporter of [fans[1]!, fans[5]!])
+        await tx.commentReport.create({ data: { commentId: spam.id, reporterId: reporter.id, reason: "spam", note: "vote-begging with a link", createdAt: new Date(spam.createdAt.getTime() + 20 * MIN) } });
       // A verified voter who hasn't voted yet, for trying the ballot live (Cookie: sid=seed-voter).
       await tx.user.upsert({
         where: { email: DEMO_VOTER_EMAIL },

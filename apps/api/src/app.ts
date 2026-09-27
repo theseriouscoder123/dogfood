@@ -18,6 +18,7 @@ import { progressRouter } from "./routes/progress";
 import { resultsRouter } from "./routes/results";
 import { integrityRouter } from "./routes/integrity";
 import { votingRouter } from "./routes/voting";
+import { commentModerationRouter, commentsRouter } from "./routes/comments";
 
 export function createApp() {
   const app = express();
@@ -48,7 +49,9 @@ export function createApp() {
   app.use("/api/events/:slug", resultsRouter);
   app.use("/api/events/:slug", integrityRouter);
   app.use("/api/events/:slug", votingRouter);
+  app.use("/api/events/:slug", commentModerationRouter);
   app.use("/api/events/:slug/teams", teamsRouter);
+  app.use("/api/events/:slug/projects/:projectId/comments", commentsRouter);
   app.use("/api/events/:slug/projects", projectsRouter);
   app.use("/api/events/:slug/judges", judgingRouter);
   app.use("/api/events/:slug/judging", judgeConsoleRouter);

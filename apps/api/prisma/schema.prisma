@@ -55,6 +55,19 @@ enum VotingMode {
   accounts
 }
 
+enum CommentsMode {
+  open // anyone signed in can comment
+  read_only // existing comments stay visible, nobody can post (e.g. after the event)
+  off // no comments shown or posted
+}
+
+enum ReportReason {
+  spam
+  abuse
+  off_topic
+  other
+}
+
 enum BallotStatus {
   counted
   quarantined
@@ -93,6 +106,9 @@ model User {
   integrity      IntegrityResolution[]
   voters         Voter[]
   voteInvites    VoteInvite[]
+  comments       Comment[]             @relation("CommentAuthor")
+  commentsHidden Comment[]             @relation("CommentHiddenBy")
+  commentReports CommentReport[]
   uploads        Upload[]
   passwordResets PasswordReset[]
 }
@@ -113,32 +129,33 @@ model Session {
 // ── event setup ─────────────────────────────────────────────────────────────
 
 model Event {
-  id                  String     @id @default(uuid()) @db.Uuid
-  slug                String     @unique
-  externalId          String?    @unique // id in an imported file, e.g. "evt_01"
+  id                  String       @id @default(uuid()) @db.Uuid
+  slug                String       @unique
+  externalId          String?      @unique // id in an imported file, e.g. "evt_01"
   name                String
-  description         String     @default("") // short summary for cards
-  tagline             String     @default("")
-  location            String     @default("Online")
-  overview            String     @default("") // markdown, shown on the event page
-  rules               String     @default("") // markdown
+  description         String       @default("") // short summary for cards
+  tagline             String       @default("")
+  location            String       @default("Online")
+  overview            String       @default("") // markdown, shown on the event page
+  rules               String       @default("") // markdown
   bannerUrl           String? // uploaded file (/api/files/...) or external URL
   logoUrl             String?
-  timezone            String     @default("UTC") // display only; every timestamp is stored in UTC
-  registrationOpensAt DateTime?  @db.Timestamptz(3)
-  submissionsOpenAt   DateTime   @db.Timestamptz(3)
-  submissionsCloseAt  DateTime   @db.Timestamptz(3)
-  judgingOpensAt      DateTime?  @db.Timestamptz(3)
-  judgingClosesAt     DateTime?  @db.Timestamptz(3)
-  maxTeamSize         Int        @default(4)
-  votingOpensAt       DateTime?  @db.Timestamptz(3) // null = no community vote
-  votingClosesAt      DateTime?  @db.Timestamptz(3)
-  votingMode          VotingMode @default(email)
-  votesPerVoter       Int        @default(3) // each voter picks up to this many projects
-  voterDomains        String[]   @default([]) // allowed email domains; empty = anyone
-  publishedRunId      String?    @unique @db.Uuid // null = results hidden
-  createdAt           DateTime   @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime   @updatedAt @db.Timestamptz(3)
+  timezone            String       @default("UTC") // display only; every timestamp is stored in UTC
+  registrationOpensAt DateTime?    @db.Timestamptz(3)
+  submissionsOpenAt   DateTime     @db.Timestamptz(3)
+  submissionsCloseAt  DateTime     @db.Timestamptz(3)
+  judgingOpensAt      DateTime?    @db.Timestamptz(3)
+  judgingClosesAt     DateTime?    @db.Timestamptz(3)
+  maxTeamSize         Int          @default(4)
+  votingOpensAt       DateTime?    @db.Timestamptz(3) // null = no community vote
+  votingClosesAt      DateTime?    @db.Timestamptz(3)
+  votingMode          VotingMode   @default(email)
+  votesPerVoter       Int          @default(3) // each voter picks up to this many projects
+  voterDomains        String[]     @default([]) // allowed email domains; empty = anyone
+  commentsMode        CommentsMode @default(open)
+  publishedRunId      String?      @unique @db.Uuid // null = results hidden
+  createdAt           DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime     @updatedAt @db.Timestamptz(3)
 
   publishedRun NormalizationRun?     @relation("PublishedRun", fields: [publishedRunId], references: [id])
   roles        EventRole[]
@@ -160,6 +177,7 @@ model Event {
   voters       Voter[]
   voteInvites  VoteInvite[]
   ballots      Ballot[]
+  comments     Comment[]
 }
 
 model EventRole {
@@ -304,6 +322,7 @@ model Project {
   results       ProjectResult[]
   answers       ProjectAnswer[]
   ballotChoices BallotChoice[]
+  comments      Comment[]
   views         ProjectView[]
 
   @@unique([eventId, externalId])
@@ -685,4 +704,52 @@ model ProjectView {
 
   @@id([projectId, viewerKey])
   @@index([eventId, viewerKey])
+}
+
+// ── project comments (T3) ───────────────────────────────────────────────────
+
+// Plain text only (links are made clickable when shown), one level of replies. Authors can edit
+// for 15 minutes and delete any time; a deleted comment keeps its row (and its text, for
+// moderation) but is never served again. Organizers hide instead of delete, with a reason.
+model Comment {
+  id           String    @id @default(uuid()) @db.Uuid
+  eventId      String    @db.Uuid
+  projectId    String    @db.Uuid
+  authorId     String    @db.Uuid
+  parentId     String?   @db.Uuid // a reply; replies to replies are refused (trigger)
+  body         String
+  ip           String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  editedAt     DateTime? @db.Timestamptz(3)
+  deletedAt    DateTime? @db.Timestamptz(3)
+  hiddenAt     DateTime? @db.Timestamptz(3)
+  hiddenById   String?   @db.Uuid // null with hiddenAt set = hidden automatically after reports
+  hiddenReason String?
+
+  event    Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author   User            @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  hiddenBy User?           @relation("CommentHiddenBy", fields: [hiddenById], references: [id], onDelete: SetNull)
+  parent   Comment?        @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[]       @relation("Replies")
+  reports  CommentReport[]
+
+  @@index([projectId, createdAt])
+  @@index([eventId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model CommentReport {
+  id         String       @id @default(uuid()) @db.Uuid
+  commentId  String       @db.Uuid
+  reporterId String       @db.Uuid
+  reason     ReportReason
+  note       String       @default("")
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  resolvedAt DateTime?    @db.Timestamptz(3) // an organizer looked at it (hid the comment or dismissed the report)
+
+  comment  Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reporter User    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, reporterId]) // one report per person per comment
 }

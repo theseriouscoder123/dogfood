@@ -171,7 +171,7 @@ projectsRouter.post("/", async (req, res) => {
 });
 
 /** Load a project of this event plus whether the caller is on its team. */
-async function projectContext(req: import("express").Request) {
+export async function projectContext(req: import("express").Request) {
   const event = await eventBySlug(slugOf(req));
   const projectId = (req.params as { projectId: string }).projectId;
   const project = /^[0-9a-f-]{36}$/i.test(projectId)

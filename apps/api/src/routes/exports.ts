@@ -252,6 +252,32 @@ const EXPORTS: ExportDef[] = [
     },
   },
   {
+    file: "comments.csv",
+    title: "Comments",
+    stage: "Community",
+    description: "Every project comment, including removed ones, with who removed it and why, and how often it was reported.",
+    async build(event) {
+      const rows = await prisma.comment.findMany({
+        where: { eventId: event.id },
+        orderBy: { createdAt: "asc" },
+        include: {
+          author: { select: { name: true, email: true } },
+          project: { select: { id: true, externalId: true, title: true } },
+          hiddenBy: { select: { name: true } },
+          _count: { select: { reports: true } },
+        },
+      });
+      return {
+        header: ["comment_id", "project_id", "project_external_id", "project", "reply_to", "author", "author_email", "created_at", "edited_at", "state", "hidden_by", "hidden_reason", "reports", "body"],
+        rows: rows.map((c) => [
+          c.id, c.project.id, c.project.externalId, c.project.title, c.parentId, c.author.name, c.author.email, c.createdAt, c.editedAt,
+          c.deletedAt ? "deleted" : c.hiddenAt ? "hidden" : "visible",
+          c.hiddenAt ? c.hiddenBy?.name ?? "automatic" : "", c.hiddenReason, c._count.reports, c.body,
+        ]),
+      };
+    },
+  },
+  {
     file: "audit.csv",
     title: "Audit log",
     stage: "Record",
