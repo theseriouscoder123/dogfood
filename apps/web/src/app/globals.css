@@ -1,10 +1,151 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+/* Dark mode is driven by data-theme on <html>, set before paint by the inline script in layout.tsx
+   (the saved choice, otherwise the OS setting). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── design tokens ─────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface-2: #f0f2f8;
+  --surface-3: #e8ebf4;
+  --line: #e3e6ef;
+  --line-strong: #cdd2e0;
+  --ink: #0e1330;
+  --ink-2: #3c4260;
+  --muted: #6b7190;
+  --primary: #3346f0;
+  --primary-hover: #2536d6;
+  --primary-soft: #eef0ff;
+  --primary-ink: #ffffff;
+  --accent: #ff6b35;
+  --accent-soft: #fff0e9;
+  --success: #0f9b4c;
+  --success-soft: #e6f6ec;
+  --warn: #b97400;
+  --warn-soft: #fff5dc;
+  --danger: #d33a3a;
+  --danger-soft: #fdecec;
+  --hero: #0b1233;
+  --hero-ink: #ffffff;
+  --shadow: 0 1px 2px rgb(14 19 48 / 0.06), 0 4px 16px -4px rgb(14 19 48 / 0.08);
+  --shadow-lg: 0 2px 4px rgb(14 19 48 / 0.05), 0 18px 40px -12px rgb(14 19 48 / 0.18);
 }
 
-body {
-  @apply bg-zinc-50 text-zinc-900 antialiased;
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #090c18;
+  --surface: #10142a;
+  --surface-2: #161b35;
+  --surface-3: #1d2342;
+  --line: #242b4b;
+  --line-strong: #333c66;
+  --ink: #edeffa;
+  --ink-2: #c4c9e2;
+  --muted: #8d94b6;
+  --primary: #7280ff;
+  --primary-hover: #8a96ff;
+  --primary-soft: #1c2152;
+  --primary-ink: #0a0d1c;
+  --accent: #ff8a5b;
+  --accent-soft: #3a1f16;
+  --success: #3fcf82;
+  --success-soft: #11301f;
+  --warn: #f2b53f;
+  --warn-soft: #362a0e;
+  --danger: #ff6f6f;
+  --danger-soft: #3a1717;
+  --hero: #060918;
+  --hero-ink: #ffffff;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px -4px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.4), 0 18px 40px -12px rgb(0 0 0 / 0.7);
 }
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-ink: var(--primary-ink);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-hero: var(--hero);
+  --color-hero-ink: var(--hero-ink);
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --shadow-card: var(--shadow);
+  --shadow-lift: var(--shadow-lg);
+}
+
+/* ── base ──────────────────────────────────────────────────────────────────── */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+::selection {
+  background: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Subtle dotted grid used on hero bands. */
+.hero-grid {
+  background-image: radial-gradient(rgb(255 255 255 / 0.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ── markdown (event overview/rules, project stories) ──────────────────────── */
+.prose {
+  color: var(--ink-2);
+  line-height: 1.7;
+  font-size: 0.95rem;
+}
+.prose > * + * { margin-top: 0.9em; }
+.prose h1, .prose h2, .prose h3 { color: var(--ink); line-height: 1.25; margin-top: 1.6em; font-weight: 700; }
+.prose h1 { font-size: 1.6rem; }
+.prose h2 { font-size: 1.3rem; }
+.prose h3 { font-size: 1.08rem; }
+.prose > :first-child { margin-top: 0; }
+.prose a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.prose ul { list-style: disc; padding-left: 1.3em; }
+.prose ol { list-style: decimal; padding-left: 1.3em; }
+.prose li + li { margin-top: 0.3em; }
+.prose strong { color: var(--ink); }
+.prose code { background: var(--surface-2); border: 1px solid var(--line); padding: 0.1em 0.35em; border-radius: 6px; font-size: 0.86em; }
+.prose pre { background: var(--surface-2); border: 1px solid var(--line); padding: 0.9em 1em; border-radius: 10px; overflow-x: auto; }
+.prose pre code { background: none; border: 0; padding: 0; }
+.prose blockquote { border-left: 3px solid var(--primary); padding-left: 1em; color: var(--muted); }
+.prose table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.prose th, .prose td { border: 1px solid var(--line); padding: 0.45em 0.7em; text-align: left; }
+.prose th { background: var(--surface-2); color: var(--ink); }
+.prose hr { border: 0; border-top: 1px solid var(--line); }

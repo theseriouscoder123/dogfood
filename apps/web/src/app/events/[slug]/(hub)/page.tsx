@@ -1,94 +1,95 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
-import type { EventDetail } from "@/lib/types";
-import { formatDate, windowLabel } from "@/lib/format";
+import { ArrowRight, Scale, Trophy } from "lucide-react";
+import { getEvent } from "@/lib/data";
+import { HubColumns } from "@/components/HubColumns";
+import { Markdown } from "@/components/Markdown";
+import { Card } from "@/components/ui";
+import { paletteFor } from "@/components/visuals";
+import { PrizeCard } from "@/components/PrizeCard";
 
-export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function EventOverviewPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const data = await api<EventDetail>(`/api/events/${encodeURIComponent(slug)}`).catch((e: unknown) => {
-    if (e instanceof ApiError && e.status === 404) notFound();
-    throw e;
-  });
-  const { event, tracks, prizes, criteria, myRoles } = data;
+  const { event, tracks, prizes, criteria } = await getEvent(slug);
+  const totalWeight = criteria.reduce((n, c) => n + c.weight, 0);
+  const about = event.overview.trim() || event.description.trim();
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">{event.name}</h1>
-        <p className="mt-1 text-zinc-600">{event.description}</p>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5">{windowLabel[event.submissionWindow]}</span>
-          {myRoles.map((r) => (
-            <span key={r} className="rounded-full bg-zinc-900 px-2 py-0.5 text-white">
-              you: {r}
-            </span>
-          ))}
-        </div>
-      </div>
+    <HubColumns slug={slug}>
+      <Card title="About this hackathon">
+        {about ? <Markdown>{about}</Markdown> : <p className="text-sm text-muted">The organizers haven&apos;t written an overview yet.</p>}
+      </Card>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <dl className="rounded-lg border border-zinc-200 bg-white p-5 text-sm">
-          <h2 className="mb-3 font-medium">Dates</h2>
-          {[
-            ["Registration opens", event.registrationOpensAt],
-            ["Submissions open", event.submissionsOpenAt],
-            ["Submissions close", event.submissionsCloseAt],
-            ["Judging opens", event.judgingOpensAt],
-            ["Judging closes", event.judgingClosesAt],
-          ].map(([label, value = null]) => (
-            <div key={label} className="flex justify-between border-b border-zinc-100 py-1.5 last:border-0">
-              <dt className="text-zinc-600">{label}</dt>
-              <dd>{formatDate(value)}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <div className="rounded-lg border border-zinc-200 bg-white p-5 text-sm">
-          <h2 className="mb-3 font-medium">Judging rubric</h2>
-          <ul className="space-y-1.5">
-            {criteria.map((c) => (
-              <li key={c.key} className="flex justify-between">
-                <span>{c.label}</span>
-                <span className="text-zinc-500">
-                  weight {c.weight} · {c.minScore}–{c.maxScore}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-3 font-medium">Tracks</h2>
-        <ul className="flex flex-wrap gap-2">
-          {tracks.map((t) => (
-            <li key={t.id}>
-              <Link href={`/events/${event.slug}/projects?track=${t.id}`} className="inline-block rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm hover:border-zinc-400">
-                {t.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {prizes.length > 0 && (
-        <section>
-          <h2 className="mb-3 font-medium">Prizes</h2>
-          <ul className="space-y-2 text-sm">
-            {prizes.map((p) => (
-              <li key={p.id} className="rounded-md border border-zinc-200 bg-white px-4 py-2">
-                <span className="font-medium">{p.name}</span> {p.value && <span className="text-zinc-500">· {p.value}</span>}
-                {p.description && <p className="text-zinc-600">{p.description}</p>}
-              </li>
-            ))}
-          </ul>
-        </section>
+      {tracks.length > 0 && (
+        <Card title="Tracks" description="Pick the challenge your project fits best. Each track is judged by its own panel.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {tracks.map((t) => {
+              const [a, b] = paletteFor(t.name);
+              return (
+                <Link
+                  key={t.id}
+                  href={`/events/${slug}/projects?track=${t.id}`}
+                  className="group flex min-w-0 items-center gap-3 rounded-xl border border-line p-3.5 transition hover:border-line-strong hover:bg-surface-2"
+                >
+                  <span className="size-10 shrink-0 rounded-xl" style={{ background: `linear-gradient(135deg, ${a}, ${b})` }} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{t.name}</span>
+                    <span className="block truncate text-xs text-muted">{t.description || `${t.projectCount ?? 0} projects`}</span>
+                  </span>
+                  <ArrowRight className="size-4 text-muted transition group-hover:translate-x-0.5 group-hover:text-ink" />
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
       )}
 
-      <Link href={`/events/${event.slug}/projects`} className="inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-700">
-        Browse the project gallery →
-      </Link>
-    </div>
+      {prizes.length > 0 && (
+        <Card
+          title="Prizes"
+          actions={
+            <Link href={`/events/${slug}/prizes`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+              All prizes <ArrowRight className="size-4" />
+            </Link>
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            {prizes.slice(0, 3).map((p, i) => (
+              <PrizeCard key={p.id} prize={p} index={i} trackName={tracks.find((t) => t.id === p.trackId)?.name} compact />
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {criteria.length > 0 && (
+        <Card title="How projects are judged" description="Every judge scores the same weighted rubric. Scores are normalized across judges before ranking.">
+          <div className="space-y-3">
+            {criteria.map((c) => {
+              const pct = totalWeight ? Math.round((c.weight / totalWeight) * 100) : 0;
+              return (
+                <div key={c.key}>
+                  <div className="mb-1.5 flex items-center justify-between text-sm">
+                    <span className="inline-flex items-center gap-2 font-semibold">
+                      <Scale className="size-4 text-muted" /> {c.label}
+                    </span>
+                    <span className="font-bold tabular-nums">{pct}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+                    <div className="h-full rounded-full bg-gradient-to-r from-primary to-[#9b6bff]" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {prizes.length === 0 && tracks.length === 0 && !about && (
+        <Card>
+          <div className="flex items-center gap-3 text-sm text-muted">
+            <Trophy className="size-5" /> More details are coming soon.
+          </div>
+        </Card>
+      )}
+    </HubColumns>
   );
 }

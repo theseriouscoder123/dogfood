@@ -1,21 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { send } from "@/lib/client";
 import { Button, ErrorText, Field, inputClass } from "@/components/ui";
 
-export function LoginForm({ next }: { next: string }) {
+export function RegisterForm({ next }: { next: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setPending(true);
     const form = new FormData(e.currentTarget);
-    const r = await send("POST", "/api/auth/login", { email: form.get("email"), password: form.get("password") });
+    setPending(true);
+    const r = await send("POST", "/api/auth/register", { name: form.get("name"), email: form.get("email"), password: form.get("password") });
     setPending(false);
     if (!r.ok) return setError(r.message);
     router.push(next);
@@ -24,22 +23,18 @@ export function LoginForm({ next }: { next: string }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <Field label="Email">
-        <input name="email" type="email" required autoComplete="email" autoFocus className={inputClass} />
+      <Field label="Full name">
+        <input name="name" required maxLength={100} autoComplete="name" autoFocus className={inputClass} />
       </Field>
-      <Field
-        label="Password"
-        hint={
-          <Link href="/forgot" className="font-semibold text-primary hover:underline">
-            Forgot your password?
-          </Link>
-        }
-      >
-        <input name="password" type="password" required autoComplete="current-password" className={inputClass} />
+      <Field label="Email">
+        <input name="email" type="email" required autoComplete="email" className={inputClass} />
+      </Field>
+      <Field label="Password" hint="At least 8 characters.">
+        <input name="password" type="password" required minLength={8} autoComplete="new-password" className={inputClass} />
       </Field>
       <ErrorText>{error}</ErrorText>
       <Button type="submit" size="lg" disabled={pending} className="w-full">
-        {pending ? "Logging in…" : "Log in"}
+        {pending ? "Creating account…" : "Create account"}
       </Button>
     </form>
   );

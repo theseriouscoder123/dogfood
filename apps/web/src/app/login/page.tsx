@@ -1,4 +1,8 @@
+import Link from "next/link";
+import { AuthShell } from "@/components/AuthShell";
 import { LoginForm } from "./LoginForm";
+
+export const metadata = { title: "Log in" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
@@ -6,9 +10,18 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
   return (
-    <div className="mx-auto max-w-sm rounded-lg border border-zinc-200 bg-white p-6">
-      <h1 className="mb-4 text-xl font-semibold">Log in</h1>
+    <AuthShell
+      title="Welcome back"
+      subtitle={
+        <>
+          New here?{" "}
+          <Link href={`/register?next=${encodeURIComponent(safeNext)}`} className="font-semibold text-primary hover:underline">
+            Create an account
+          </Link>
+        </>
+      }
+    >
       <LoginForm next={safeNext} />
-    </div>
+    </AuthShell>
   );
 }
