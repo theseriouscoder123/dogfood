@@ -35,7 +35,7 @@ function requireClosed(event: { submissionsOpenAt: Date; submissionsCloseAt: Dat
 }
 
 /** Everything the algorithm needs, read in one consistent snapshot. */
-async function loadAssignInput(db: Db, eventId: string) {
+export async function loadAssignInput(db: Db, eventId: string) {
   const [projects, roles, judgeTracks, assignments, conflicts] = await Promise.all([
     db.project.findMany({ where: { eventId, status: "submitted", duplicateOfId: null }, select: { id: true, trackId: true, teamId: true } }),
     db.eventRole.findMany({ where: { eventId, role: "judge" }, select: { userId: true } }),

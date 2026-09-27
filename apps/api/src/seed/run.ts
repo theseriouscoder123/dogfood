@@ -8,6 +8,7 @@ import { hashPassword } from "../auth/password";
 import { sha256 } from "../lib/crypto";
 import { importFixtures } from "./importFixtures";
 import { seedShowcase } from "./showcase";
+import { DEMO_JUDGE_EMAIL, seedJudgingDemo } from "./judgingDemo";
 
 const DEMO_PASSWORD = "dogfood2026";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "admin@dogfood.local").toLowerCase();
@@ -21,6 +22,8 @@ const DEMO_SESSIONS = [
   { label: "judge_b", token: "seed-judge-b", who: { judge: "jdg_26" } },
   { label: "participant", token: "seed-participant", who: { email: "priya1@example.org" } },
   { label: "admin", token: "seed-admin", who: { email: ADMIN_EMAIL } },
+  // Not used by the checker: a judge with live work in the "spring-build-sprint" demo event.
+  { label: "judge_demo", token: "seed-judge-demo", who: { email: DEMO_JUDGE_EMAIL } },
 ] as const;
 
 async function main() {
@@ -46,7 +49,10 @@ async function main() {
     create: { eventId: event.id, userId: organizer.id, role: "organizer" },
   });
 
-  if (process.env.SEED_SHOWCASE !== "false") await seedShowcase(prisma, event.id, organizer.id);
+  if (process.env.SEED_SHOWCASE !== "false") {
+    await seedShowcase(prisma, event.id, organizer.id);
+    await seedJudgingDemo(prisma, organizer.id, demoHash);
+  }
 
   if (created && summary) {
     console.log(`imported "${event.name}" (${event.slug}): ${summary.projects} projects, ${summary.judges} judges, ${summary.reviews} reviews, criteria ${summary.criteria.join("/")}`);

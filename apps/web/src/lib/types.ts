@@ -222,3 +222,65 @@ export type JudgeAssignment = {
   judgingWindow: JudgingWindow;
   nav: { position: number; total: number; previousId: string | null; nextId: string | null; nextUnscoredId: string | null };
 };
+
+export type Pace = "unassigned" | "waiting" | "done" | "on_track" | "behind" | "not_started" | "missed";
+export type ProgressJudge = {
+  id: string;
+  externalId: string | null;
+  name: string;
+  email: string;
+  tracks: string[];
+  active: number;
+  submitted: number;
+  inProgress: number;
+  notStarted: number;
+  recused: number;
+  lastActivityAt: string | null;
+  medianMinutes: number | null;
+  lastRemindedAt: string | null;
+  pace: Pace;
+  straggler: boolean;
+};
+export type JudgingProgress = {
+  generatedAt: string;
+  judgingWindow: JudgingWindow;
+  window: { opensAt: string; closesAt: string | null; elapsed: number | null };
+  target: number;
+  totals: {
+    reviews: number;
+    submitted: number;
+    inProgress: number;
+    notStarted: number;
+    recused: number;
+    projects: number;
+    projectsComplete: number;
+    projectsUnreviewed: number;
+    judges: number;
+    judgesDone: number;
+    stragglers: number;
+  };
+  timeline: { start: string; end: string; points: Array<{ t: string; n: number | null }> };
+  judges: ProgressJudge[];
+  tracks: Array<{ id: string | null; name: string; projects: number; assigned: number; submitted: number; complete: number }>;
+  attention: Array<{
+    id: string;
+    title: string;
+    externalId: string | null;
+    team: string;
+    track: string | null;
+    assigned: number;
+    submitted: number;
+    reasons: string[];
+    pending: Array<{ assignmentId: string; judgeId: string; judge: string; status: AssignmentStatus; straggler: boolean }>;
+  }>;
+};
+export type RedistributePreview = {
+  judge: { id: string; name: string };
+  inputHash: string;
+  seed: number;
+  target: number;
+  released: Array<{ assignmentId: string; projectId: string; title: string }>;
+  moves: Array<{ projectId: string; title: string; judgeId: string; judge: string; loadAfter: number }>;
+  unplaced: Array<{ projectId: string; title: string; have: number; need: number; reason: string }>;
+};
+export type ExportItem = { file: string; title: string; stage: string; description: string; rows: number; columns: number; url: string };

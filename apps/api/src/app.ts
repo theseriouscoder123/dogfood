@@ -14,6 +14,7 @@ import { filesRouter, uploadsRouter } from "./routes/uploads";
 import { judgingAdminRouter } from "./routes/judgingAdmin";
 import { assignmentsRouter } from "./routes/assignments";
 import { judgeConsoleRouter } from "./routes/judgeConsole";
+import { progressRouter } from "./routes/progress";
 
 export function createApp() {
   const app = express();
@@ -40,6 +41,7 @@ export function createApp() {
   app.use("/api/events", eventAdminRouter);
   app.use("/api/events/:slug", judgingAdminRouter);
   app.use("/api/events/:slug", assignmentsRouter);
+  app.use("/api/events/:slug", progressRouter);
   app.use("/api/events/:slug/teams", teamsRouter);
   app.use("/api/events/:slug/projects", projectsRouter);
   app.use("/api/events/:slug/judges", judgingRouter);

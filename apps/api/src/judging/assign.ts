@@ -30,6 +30,11 @@ export type AssignInput = {
   reviewsPerProject: number;
   maxPerJudge: number | null;
   seed: number;
+  /**
+   * Only fill these projects (e.g. the work released by a judge who dropped out). Every other
+   * project still counts toward judge load and connectivity but gets no new assignments.
+   */
+  onlyProjects?: string[];
 };
 
 export type Shortfall = { projectId: string; have: number; need: number; reason: "no_eligible_judges" | "not_enough_eligible_judges" | "judge_cap_reached" };
@@ -111,7 +116,8 @@ export function planAssignments(input: AssignInput): AssignPlan {
 
   // Scarce projects first; stable seeded order among equals.
   const projectTie = new Map(input.projects.map((p) => [p.id, random()]));
-  const order = [...input.projects].sort(
+  const targets = input.onlyProjects ? new Set(input.onlyProjects) : null;
+  const order = input.projects.filter((p) => !targets || targets.has(p.id)).sort(
     (a, b) => eligible.get(a.id)!.length - eligible.get(b.id)!.length || projectTie.get(a.id)! - projectTie.get(b.id)!,
   );
 
@@ -148,6 +154,7 @@ export function planAssignments(input: AssignInput): AssignPlan {
   const shortfalls: Shortfall[] = [];
   const coverage: Record<number, number> = {};
   for (const p of input.projects) {
+    if (targets && !targets.has(p.id)) continue;
     const have = onProject.get(p.id)!.size;
     coverage[have] = (coverage[have] ?? 0) + 1;
     if (have < k) {

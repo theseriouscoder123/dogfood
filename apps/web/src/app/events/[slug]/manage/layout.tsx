@@ -27,7 +27,7 @@ export default async function ManageLayout({ children, params }: { children: Rea
   }
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-8 px-4 pt-8 sm:px-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+    <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 pt-8 sm:px-6 lg:grid-cols-[250px_minmax(0,1fr)]">
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <div className="mb-5 flex items-center gap-3">
           <LogoTile seed={event.slug} src={event.logoUrl} name={event.name} className="size-11 text-sm" />
