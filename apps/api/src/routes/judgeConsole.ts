@@ -111,7 +111,7 @@ judgeConsoleRouter.get("/:assignmentId", async (req, res) => {
   });
 });
 
-const ReviewBody = z.object({
+export const ReviewBody = z.object({
   scores: z.record(z.uuid(), z.number().int()).default({}),
   comment: z.string().max(5000).default(""),
 });
@@ -203,10 +203,12 @@ judgeConsoleRouter.post("/:assignmentId/submit", async (req, res) => {
  * also keeps the assignment engine from ever sending you that team again. Recusal is final
  * for the pair; a submitted review can't be recused (ask an organizer).
  */
+export const RecuseBody = z.object({ reason: z.string().trim().min(3).max(500), declareConflict: z.boolean().default(false) });
+
 judgeConsoleRouter.post("/:assignmentId/recuse", async (req, res) => {
   const { event, judgeId } = await judgeContext(req);
   const a = await myAssignment(event.id, judgeId, (req.params as { assignmentId: string }).assignmentId);
-  const body = z.object({ reason: z.string().trim().min(3).max(500), declareConflict: z.boolean().default(false) }).parse(req.body);
+  const body = RecuseBody.parse(req.body);
   if (a.status === "recused") throw new HttpError(409, "recused", "You've already recused yourself from this project.");
   if (a.status === "submitted") throw new HttpError(409, "review_submitted", "You've submitted this review. Ask an organizer if you need to withdraw it.");
   if (judgingWindow(event) === "closed") enforce("judging_closed");

@@ -28,6 +28,9 @@ const DEMO_SESSIONS = [
   { label: "voter", token: "seed-voter", who: { email: DEMO_VOTER_EMAIL } },
 ] as const;
 
+// A read-only API token for the organizer, so the API docs' curl examples work out of the box.
+const DEMO_API_TOKEN = "dfp_demo-organizer-read-only";
+
 async function main() {
   const fixture = JSON.parse(await readFile(config.fixturesPath, "utf8"));
   const demoHash = config.seedDemo ? await hashPassword(DEMO_PASSWORD) : null;
@@ -65,7 +68,8 @@ async function main() {
 
   if (!config.seedDemo) {
     const { count } = await prisma.session.deleteMany({ where: { seeded: true } });
-    console.log(`SEED_DEMO=false: removed ${count} demo sessions`);
+    const tokens = await prisma.apiToken.deleteMany({ where: { seeded: true } });
+    console.log(`SEED_DEMO=false: removed ${count} demo sessions and ${tokens.count} demo API tokens`);
     return;
   }
 
@@ -86,6 +90,12 @@ async function main() {
     });
     lines.push(`  ${s.label.padEnd(12)} Cookie: sid=${s.token.padEnd(18)} ${user.email}`);
   }
+  await prisma.apiToken.upsert({
+    where: { tokenHash: sha256(DEMO_API_TOKEN) },
+    update: { userId: organizer.id, revokedAt: null, expiresAt: null, scopes: ["read"], seeded: true },
+    create: { tokenHash: sha256(DEMO_API_TOKEN), prefix: DEMO_API_TOKEN.slice(0, 10), name: "Demo (read-only)", userId: organizer.id, scopes: ["read"], seeded: true },
+  });
+  lines.push(`  ${"api token".padEnd(12)} Authorization: Bearer ${DEMO_API_TOKEN}   organizer, read-only`);
   console.log(["", "seeded. test logins:", ...lines, `  password for every seeded account: ${DEMO_PASSWORD}`, ""].join("\n"));
 }
 

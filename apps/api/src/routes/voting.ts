@@ -20,6 +20,7 @@ import { prisma } from "../db";
 import { accessFor, decideOrganize, decideVote, enforce, votingWindow, type VoterIdentity } from "../policy";
 import { appendAudit, audit, fromRequest } from "../audit";
 import { eventBySlug } from "../lib/events";
+import { requireBrowserSession } from "../auth/session";
 import { HttpError } from "../lib/http";
 import { config } from "../config";
 import { randomToken, sha256 } from "../lib/crypto";
@@ -151,12 +152,15 @@ votingRouter.get("/vote", async (req, res) => {
   });
 });
 
+export const RedeemBody = z.object({ code: z.string().trim().min(6).max(64) });
+
 votingRouter.post("/vote/redeem", async (req, res) => {
+  requireBrowserSession(req);
   const event = await eventBySlug((req.params as { slug?: string }).slug);
   const window = votingWindow(event);
   if (window !== "open") enforce(window === "off" ? "voting_off" : window === "not_open" ? "voting_not_open" : "voting_closed");
   if (event.votingMode !== "invite") throw new HttpError(409, "not_invite_mode", "This event doesn't use ballot codes.");
-  const { code } = z.object({ code: z.string().trim().min(6).max(64) }).parse(req.body);
+  const { code } = RedeemBody.parse(req.body);
 
   const ip = req.ip ?? null;
   const failures = ip ? await prisma.auditLog.count({ where: { eventId: event.id, action: "vote.code_rejected", ip, createdAt: { gt: new Date(Date.now() - 3_600_000) } } }) : 0;
@@ -189,9 +193,10 @@ function setInviteCookie(res: Response, event: Event, token: string) {
   res.cookie(inviteCookie(event), token, { httpOnly: true, sameSite: "lax", secure: config.cookieSecure, path: "/", expires: until });
 }
 
-const BallotBody = z.object({ projectIds: z.array(z.uuid()).max(20) });
+export const BallotBody = z.object({ projectIds: z.array(z.uuid()).max(20) });
 
 votingRouter.put("/ballot", async (req, res) => {
+  requireBrowserSession(req);
   const event = await eventBySlug((req.params as { slug?: string }).slug);
   const [access, r] = await Promise.all([accessFor(req.actor, event.id), resolveVoter(req, event)]);
   enforce(decideVote(access, votingWindow(event), event.votingMode, r.identity));
@@ -302,7 +307,7 @@ votingRouter.get("/voting/admin", async (req, res) => {
   });
 });
 
-const SettingsBody = z.object({
+export const SettingsBody = z.object({
   opensAt: z.iso.datetime().nullable(),
   closesAt: z.iso.datetime().nullable(),
   mode: z.enum(["email", "invite", "accounts"]),
@@ -338,9 +343,11 @@ votingRouter.put("/voting/settings", async (req, res) => {
   res.json({ settings: after, window: votingWindow({ votingOpensAt: opensAt, votingClosesAt: closesAt }) });
 });
 
+export const CreateInvitesBody = z.object({ count: z.number().int().min(1).max(1000), label: z.string().trim().min(1).max(60) });
+
 votingRouter.post("/voting/invites", async (req, res) => {
   const event = await staffEvent(req);
-  const body = z.object({ count: z.number().int().min(1).max(1000), label: z.string().trim().min(1).max(60) }).parse(req.body);
+  const body = CreateInvitesBody.parse(req.body);
   const codes = Array.from({ length: body.count }, makeInviteCode);
   await prisma.$transaction(async (tx) => {
     await tx.voteInvite.createMany({ data: codes.map((c) => ({ eventId: event.id, codeHash: sha256(canonicalCode(c)), label: body.label, createdById: req.actor!.id })) });
@@ -350,9 +357,11 @@ votingRouter.post("/voting/invites", async (req, res) => {
   res.status(201).json({ label: body.label, codes: codes.map((code) => ({ code, url: `/events/${event.slug}/vote?code=${encodeURIComponent(code)}` })) });
 });
 
+export const RevokeInvitesBody = z.object({ label: z.string().trim().min(1).max(60) });
+
 votingRouter.post("/voting/invites/revoke", async (req, res) => {
   const event = await staffEvent(req);
-  const { label } = z.object({ label: z.string().trim().min(1).max(60) }).parse(req.body);
+  const { label } = RevokeInvitesBody.parse(req.body);
   const result = await prisma.$transaction(async (tx) => {
     const r = await tx.voteInvite.updateMany({ where: { eventId: event.id, label, revokedAt: null, voter: null }, data: { revokedAt: new Date() } });
     await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "voting.invites_revoked", entityType: "Event", entityId: event.id, after: { label, revoked: r.count } });
@@ -461,12 +470,12 @@ votingRouter.get("/voting/review", async (req, res) => {
 
 const Ids = z.array(z.uuid()).min(1).max(2000);
 
+export const QuarantineBody = z.object({ ballotIds: Ids, reason: z.string().trim().min(5, "Say why (at least 5 characters).").max(500), incidentKey: z.string().max(300).optional() });
+
 votingRouter.post("/voting/review/quarantine", async (req, res) => {
   const event = await staffEvent(req);
   if (event.votingPublishedAt) throw new HttpError(409, "results_published", "People's Choice results are published. Unpublish them first, so the public ballot file doesn't change under anyone.");
-  const body = z
-    .object({ ballotIds: Ids, reason: z.string().trim().min(5, "Say why (at least 5 characters).").max(500), incidentKey: z.string().max(300).optional() })
-    .parse(req.body);
+  const body = QuarantineBody.parse(req.body);
   const result = await prisma.$transaction(async (tx) => {
     const r = await tx.ballot.updateMany({ where: { eventId: event.id, id: { in: body.ballotIds }, status: "counted" }, data: { status: "quarantined", quarantineReason: body.reason } });
     await appendAudit(tx, {
@@ -478,10 +487,12 @@ votingRouter.post("/voting/review/quarantine", async (req, res) => {
   res.json({ quarantined: result.count });
 });
 
+export const RestoreBody = z.object({ ballotIds: Ids, reason: z.string().trim().min(5, "Say why (at least 5 characters).").max(500) });
+
 votingRouter.post("/voting/review/restore", async (req, res) => {
   const event = await staffEvent(req);
   if (event.votingPublishedAt) throw new HttpError(409, "results_published", "People's Choice results are published. Unpublish them first, so the public ballot file doesn't change under anyone.");
-  const body = z.object({ ballotIds: Ids, reason: z.string().trim().min(5, "Say why (at least 5 characters).").max(500) }).parse(req.body);
+  const body = RestoreBody.parse(req.body);
   const result = await prisma.$transaction(async (tx) => {
     const r = await tx.ballot.updateMany({ where: { eventId: event.id, id: { in: body.ballotIds }, status: "quarantined" }, data: { status: "counted", quarantineReason: null } });
     await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "ballots.restored", entityType: "Event", entityId: event.id, after: { count: r.count, reason: body.reason, ballotIds: body.ballotIds } });
@@ -490,9 +501,11 @@ votingRouter.post("/voting/review/restore", async (req, res) => {
   res.json({ restored: result.count });
 });
 
+export const ResolveIncidentBody = z.object({ incidentKey: z.string().min(1).max(300), status: z.enum(["dismissed", "open"]), note: z.string().trim().max(1000).default("") });
+
 votingRouter.post("/voting/review/resolve", async (req, res) => {
   const event = await staffEvent(req);
-  const body = z.object({ incidentKey: z.string().min(1).max(300), status: z.enum(["dismissed", "open"]), note: z.string().trim().max(1000).default("") }).parse(req.body);
+  const body = ResolveIncidentBody.parse(req.body);
   const flagKey = `vote:${body.incidentKey}`;
   if (body.status === "open") {
     const existing = await prisma.integrityResolution.findUnique({ where: { eventId_flagKey: { eventId: event.id, flagKey } } });
@@ -644,10 +657,12 @@ votingRouter.get("/voting/ballots.json", async (req, res) => {
   res.json({ sha256: file.sha256, ...file.body });
 });
 
+export const ReceiptBody = z.object({ receipt: z.string().trim().min(6).max(40) });
+
 votingRouter.post("/voting/receipt", async (req, res) => {
   const event = await publishedEvent(req);
   // In the body, not the URL, so receipts don't end up in logs or browser history.
-  const { receipt } = z.object({ receipt: z.string().trim().min(6).max(40) }).parse(req.body);
+  const { receipt } = ReceiptBody.parse(req.body);
   const file = fileFor(event, await votingData(event.id));
   const hash = receiptHash(receipt);
   const found = file.body.ballots.find((b) => b.receiptHash === hash);

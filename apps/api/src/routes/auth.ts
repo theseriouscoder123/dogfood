@@ -13,13 +13,13 @@ export const authRouter = Router();
 
 const email = z.email().transform((s) => s.trim().toLowerCase());
 
-const RegisterBody = z.object({
+export const RegisterBody = z.object({
   email,
   name: z.string().trim().min(1).max(100),
   password: z.string().min(8).max(200),
 });
 
-const LoginBody = z.object({ email, password: z.string().min(1).max(200) });
+export const LoginBody = z.object({ email, password: z.string().min(1).max(200) });
 
 authRouter.post("/register", async (req, res) => {
   const body = RegisterBody.parse(req.body);
@@ -80,8 +80,10 @@ authRouter.get("/me", async (req, res) => {
 const RESET_TTL_MS = 60 * 60 * 1000;
 
 /** Always answers the same way, so it can't be used to discover which emails have accounts. */
+export const ForgotBody = z.object({ email });
+
 authRouter.post("/forgot", async (req, res) => {
-  const body = z.object({ email }).parse(req.body);
+  const body = ForgotBody.parse(req.body);
   const user = await prisma.user.findUnique({ where: { email: body.email } });
   if (user) {
     const recent = await prisma.passwordReset.count({ where: { userId: user.id, createdAt: { gt: new Date(Date.now() - RESET_TTL_MS) } } });
@@ -106,8 +108,10 @@ authRouter.post("/forgot", async (req, res) => {
   res.json({ ok: true });
 });
 
+export const ResetBody = z.object({ token: z.string().min(10).max(200), password: z.string().min(8).max(200) });
+
 authRouter.post("/reset", async (req, res) => {
-  const body = z.object({ token: z.string().min(10).max(200), password: z.string().min(8).max(200) }).parse(req.body);
+  const body = ResetBody.parse(req.body);
   const reset = await prisma.passwordReset.findUnique({ where: { tokenHash: sha256(body.token) }, include: { user: true } });
   if (!reset || reset.usedAt || reset.expiresAt <= new Date()) {
     throw new HttpError(400, "invalid_reset", "This reset link is invalid or has expired. Ask for a new one.");
@@ -138,8 +142,10 @@ const LINKS_PER_IP_PER_HOUR = 20;
 /** Only same-site paths, so a link can never be turned into an open redirect. */
 const safeNext = (next: string | undefined) => (next && /^\/(?!\/)[\w\-./?=&%]*$/.test(next) ? next : "/");
 
+export const LinkBody = z.object({ email, next: z.string().max(300).optional() });
+
 authRouter.post("/link", async (req, res) => {
-  const body = z.object({ email, next: z.string().max(300).optional() }).parse(req.body);
+  const body = LinkBody.parse(req.body);
   const hourAgo = new Date(Date.now() - 3_600_000);
   const ip = req.ip ?? null;
   if (ip && (await prisma.loginLink.count({ where: { ip, createdAt: { gt: hourAgo } } })) >= LINKS_PER_IP_PER_HOUR)
@@ -168,8 +174,10 @@ authRouter.post("/link", async (req, res) => {
   res.json({ ok: true });
 });
 
+export const LinkVerifyBody = z.object({ token: z.string().min(10).max(200) });
+
 authRouter.post("/link/verify", async (req, res) => {
-  const body = z.object({ token: z.string().min(10).max(200) }).parse(req.body);
+  const body = LinkVerifyBody.parse(req.body);
   const link = await prisma.loginLink.findUnique({ where: { tokenHash: sha256(body.token) } });
   if (!link || link.usedAt || link.expiresAt <= new Date()) throw new HttpError(400, "invalid_link", "This sign-in link is invalid, used or expired. Ask for a new one.");
 

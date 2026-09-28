@@ -98,7 +98,7 @@ integrityRouter.get("/integrity", async (req, res) => {
   });
 });
 
-const ResolveBody = z.object({
+export const ResolveBody = z.object({
   flagKey: z.string().min(1).max(300),
   status: z.enum(["dismissed", "confirmed", "open"]),
   note: z.string().trim().max(1000).default(""),

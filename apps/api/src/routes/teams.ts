@@ -71,9 +71,11 @@ teamsRouter.get("/mine", async (req, res) => {
   });
 });
 
+export const TeamNameBody = z.object({ name: TeamName });
+
 teamsRouter.post("/", async (req, res) => {
   const { event, actor } = await openEventFor(req);
-  const { name } = z.object({ name: TeamName }).parse(req.body);
+  const { name } = TeamNameBody.parse(req.body);
   if (await myMembership(event.id, actor.id)) throw new HttpError(409, "already_on_team", "You are already on a team in this event.");
 
   const team = await prisma.$transaction(async (tx) => {
@@ -92,7 +94,7 @@ teamsRouter.post("/", async (req, res) => {
 
 teamsRouter.patch("/mine", async (req, res) => {
   const { event, actor } = await openEventFor(req);
-  const { name } = z.object({ name: TeamName }).parse(req.body);
+  const { name } = TeamNameBody.parse(req.body);
   const m = await myMembership(event.id, actor.id);
   if (!m) throw notFound("Team");
   if (m.role !== "captain") throw forbidden("Only the team captain can rename the team.");
@@ -104,7 +106,7 @@ teamsRouter.patch("/mine", async (req, res) => {
   res.json({ team: { id: m.teamId, name } });
 });
 
-const InviteBody = z.object({
+export const InviteBody = z.object({
   maxUses: z.number().int().min(1).max(50).default(10),
   expiresInHours: z.number().int().min(1).max(24 * 30).default(72),
 });
@@ -127,9 +129,11 @@ teamsRouter.post("/mine/invites", async (req, res) => {
 });
 
 /** Email a single-use invite link to one person. */
+export const EmailInviteBody = z.object({ email: z.email().transform((e) => e.trim().toLowerCase()) });
+
 teamsRouter.post("/mine/invites/email", async (req, res) => {
   const { event, actor } = await openEventFor(req);
-  const { email } = z.object({ email: z.email().transform((e) => e.trim().toLowerCase()) }).parse(req.body);
+  const { email } = EmailInviteBody.parse(req.body);
   const m = await myMembership(event.id, actor.id);
   if (!m) throw notFound("Team");
   const team = await prisma.team.findUniqueOrThrow({ where: { id: m.teamId }, include: { _count: { select: { members: true } } } });

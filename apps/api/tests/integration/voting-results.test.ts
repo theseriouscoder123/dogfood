@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { api, makeEvent, makeTeamWithProject, makeUser, prisma } from "./helpers";
 import { canonicalJson, sha256 } from "../../src/lib/crypto";
 import { verifyAuditChain } from "../../src/audit";
+import { VotingResults } from "../../src/openapi/schemas";
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -70,6 +71,7 @@ describe("after voting closes", () => {
     expect(pub.status).toBe(200);
 
     const results = await api().get(`${s.base}/voting/results`); // anonymous
+    VotingResults.parse(results.body); // the documented response shape (openapi/schemas.ts) holds
     expect(results.body.ballotFile).toMatchObject({ sha256: pub.body.ballotsHash, matches: true, ballots: 7 });
     expect(results.body.ranking[0]).toMatchObject({ rank: 1, votes: 4, project: { title: "Aurora" } });
 

@@ -543,3 +543,19 @@ export type VotingResultsPreview = {
   ranking: VoteRankingRow[];
   positionCheck: PositionCheck;
 };
+
+// ── API tokens (T4) ──
+export type ApiTokenScope = "read" | "write";
+export type ApiToken = {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: ApiTokenScope[];
+  state: "active" | "expired" | "revoked";
+  createdAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  lastUsedIp: string | null;
+  revokedAt: string | null;
+};
+export type ApiTokenList = { tokens: ApiToken[]; limits: { maxActive: number; lifetimesDays: Array<number | null>; scopes: ApiTokenScope[] } };

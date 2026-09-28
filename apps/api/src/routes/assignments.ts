@@ -55,7 +55,7 @@ export async function loadAssignInput(db: Db, eventId: string) {
   };
 }
 
-const PlanParams = z.object({
+export const PlanParams = z.object({
   reviewsPerProject: z.number().int().min(1).max(10).default(3),
   maxPerJudge: z.number().int().min(1).max(500).nullable().default(null),
   seed: z.number().int().min(0).max(2 ** 31 - 1).optional(),
@@ -113,10 +113,12 @@ assignmentsRouter.post("/assignments/preview", async (req, res) => {
   });
 });
 
+export const CommitPlanBody = PlanParams.extend({ seed: z.number().int().min(0).max(2 ** 31 - 1), inputHash: z.string().length(64) });
+
 assignmentsRouter.post("/assignments/commit", async (req, res) => {
   const event = await staffEvent(req);
   requireClosed(event);
-  const body = PlanParams.extend({ seed: z.number().int().min(0).max(2 ** 31 - 1), inputHash: z.string().length(64) }).parse(req.body);
+  const body = CommitPlanBody.parse(req.body);
   if (body.mode !== "fill") throw new HttpError(400, "cannot_commit_simulation", "A from-scratch simulation is for comparison only.");
 
   const result = await prisma.$transaction(
@@ -243,10 +245,12 @@ async function assertAssignable(eventId: string, judgeId: string, projectId: str
   if (reason) throw new HttpError(409, "not_eligible", `This judge can't take this project: ${reason}.`);
 }
 
+export const AddAssignmentBody = z.object({ judgeId: z.uuid(), projectId: z.uuid() });
+
 assignmentsRouter.post("/assignments", async (req, res) => {
   const event = await staffEvent(req);
   requireClosed(event);
-  const body = z.object({ judgeId: z.uuid(), projectId: z.uuid() }).parse(req.body);
+  const body = AddAssignmentBody.parse(req.body);
   await assertAssignable(event.id, body.judgeId, body.projectId);
   const assignment = await prisma.$transaction(async (tx) => {
     const a = await tx.assignment.create({ data: { ...body, eventId: event.id } });
@@ -279,11 +283,13 @@ assignmentsRouter.delete("/assignments/:assignmentId", async (req, res) => {
  * Hand a project to a different judge. A recused assignment stays as history (so the pair is
  * never re-assigned); an untouched one is replaced. A submitted review can't be reassigned.
  */
+export const ReassignBody = z.object({ judgeId: z.uuid() });
+
 assignmentsRouter.post("/assignments/:assignmentId/reassign", async (req, res) => {
   const event = await staffEvent(req);
   requireClosed(event);
   const a = await assignmentInEvent(event.id, (req.params as { assignmentId: string }).assignmentId);
-  const { judgeId } = z.object({ judgeId: z.uuid() }).parse(req.body);
+  const { judgeId } = ReassignBody.parse(req.body);
   if (a.status === "submitted" || a.review?.status === "submitted") throw new HttpError(409, "review_submitted", "A submitted review can't be reassigned.");
   await assertAssignable(event.id, judgeId, a.projectId);
 

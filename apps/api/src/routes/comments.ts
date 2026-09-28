@@ -22,6 +22,7 @@ import { prisma } from "../db";
 import { accessFor, decideComment, decideOrganize, decideViewProject, enforce, judgingWindow, type Outcome } from "../policy";
 import { appendAudit, fromRequest } from "../audit";
 import { eventBySlug } from "../lib/events";
+import { requireBrowserSession } from "../auth/session";
 import { HttpError, notFound, unauthenticated } from "../lib/http";
 import { projectContext } from "./projects";
 import {
@@ -129,10 +130,13 @@ async function guard(req: Request, authorId: string, body: string, exceptId?: st
   if (fp && recent.some((r) => fingerprintBody(r.body) === fp)) throw new HttpError(409, "duplicate_comment", "You've already posted that comment. Say something new, or edit the first one.");
 }
 
+export const CreateCommentBody = z.object({ body: Body, parentId: z.uuid().nullable().optional() });
+
 commentsRouter.post("/", async (req, res) => {
+  requireBrowserSession(req);
   const { event, project, access } = await publicProject(req);
   enforce(decideComment(access, event.commentsMode, judgingWindow(event)));
-  const input = z.object({ body: Body, parentId: z.uuid().nullable().optional() }).parse(req.body);
+  const input = CreateCommentBody.parse(req.body);
   if (input.parentId) {
     const parent = await prisma.comment.findFirst({ where: { id: input.parentId, projectId: project.id } });
     if (!parent) throw notFound("Comment");
@@ -157,13 +161,16 @@ async function ownComment(req: Request, projectId: string) {
   return c;
 }
 
+export const EditCommentBody = z.object({ body: Body });
+
 commentsRouter.patch("/:commentId", async (req, res) => {
+  requireBrowserSession(req);
   const { event, project, access } = await publicProject(req);
   enforce(decideComment(access, event.commentsMode, judgingWindow(event)));
   const c = await ownComment(req, project.id);
   if (c.deletedAt || c.hiddenAt) throw new HttpError(409, "removed", "This comment was removed and can't be edited.");
   if (!withinEditWindow(c.createdAt)) throw new HttpError(409, "edit_window_closed", "Comments can be edited for 15 minutes after posting. Post a reply to add something.");
-  const { body } = z.object({ body: Body }).parse(req.body);
+  const { body } = EditCommentBody.parse(req.body);
   await guard(req, c.authorId, body, c.id);
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.comment.update({ where: { id: c.id }, data: { body, editedAt: new Date() } });
@@ -185,14 +192,17 @@ commentsRouter.delete("/:commentId", async (req, res) => {
   res.status(204).end();
 });
 
+export const ReportCommentBody = z.object({ reason: z.enum(["spam", "abuse", "off_topic", "other"]), note: z.string().trim().max(500).default("") });
+
 commentsRouter.post("/:commentId/report", async (req, res) => {
+  requireBrowserSession(req);
   const { event, project } = await publicProject(req);
   if (!req.actor) throw unauthenticated();
   const id = (req.params as { commentId: string }).commentId;
   const c = z.uuid().safeParse(id).success ? await prisma.comment.findFirst({ where: { id, projectId: project.id } }) : null;
   if (!c || c.deletedAt) throw notFound("Comment");
   if (c.authorId === req.actor.id) throw new HttpError(400, "own_comment", "You can't report your own comment. Delete it instead.");
-  const body = z.object({ reason: z.enum(["spam", "abuse", "off_topic", "other"]), note: z.string().trim().max(500).default("") }).parse(req.body);
+  const body = ReportCommentBody.parse(req.body);
   const existing = await prisma.commentReport.findUnique({ where: { commentId_reporterId: { commentId: c.id, reporterId: req.actor.id } } });
   if (existing) throw new HttpError(409, "already_reported", "You've already reported this comment. The organizers will review it.");
 
@@ -227,9 +237,11 @@ async function commentInEvent(eventId: string, req: Request) {
   return c;
 }
 
+export const ModerationQuery = z.object({ filter: z.enum(["reported", "hidden", "recent"]).catch("reported") });
+
 commentModerationRouter.get("/comments/moderation", async (req, res) => {
   const event = await staffEvent(req);
-  const filter = z.enum(["reported", "hidden", "recent"]).catch("reported").parse(req.query.filter);
+  const filter = ModerationQuery.parse(req.query).filter;
   const where =
     filter === "reported"
       ? { eventId: event.id, deletedAt: null, reports: { some: { resolvedAt: null } } }
@@ -272,9 +284,11 @@ commentModerationRouter.get("/comments/moderation", async (req, res) => {
   });
 });
 
+export const CommentsSettingsBody = z.object({ mode: z.enum(["open", "read_only", "off"]) });
+
 commentModerationRouter.put("/comments/settings", async (req, res) => {
   const event = await staffEvent(req);
-  const { mode } = z.object({ mode: z.enum(["open", "read_only", "off"]) }).parse(req.body);
+  const { mode } = CommentsSettingsBody.parse(req.body);
   await prisma.$transaction(async (tx) => {
     await tx.event.update({ where: { id: event.id }, data: { commentsMode: mode } });
     await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "comments.settings_updated", entityType: "Event", entityId: event.id, before: { mode: event.commentsMode }, after: { mode } });
@@ -282,10 +296,12 @@ commentModerationRouter.put("/comments/settings", async (req, res) => {
   res.json({ mode });
 });
 
+export const HideCommentBody = z.object({ reason: z.string().trim().min(3, "Say why (at least 3 characters).").max(300) });
+
 commentModerationRouter.post("/comments/:commentId/hide", async (req, res) => {
   const event = await staffEvent(req);
   const c = await commentInEvent(event.id, req);
-  const { reason } = z.object({ reason: z.string().trim().min(3, "Say why (at least 3 characters).").max(300) }).parse(req.body);
+  const { reason } = HideCommentBody.parse(req.body);
   await prisma.$transaction(async (tx) => {
     await tx.comment.update({ where: { id: c.id }, data: { hiddenAt: new Date(), hiddenById: req.actor!.id, hiddenReason: reason } });
     await tx.commentReport.updateMany({ where: { commentId: c.id, resolvedAt: null }, data: { resolvedAt: new Date() } });

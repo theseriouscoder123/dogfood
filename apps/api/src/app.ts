@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type Router } from "express";
 import cookieParser from "cookie-parser";
 import { randomUUID } from "node:crypto";
 import { loadActor } from "./auth/session";
@@ -19,6 +19,39 @@ import { resultsRouter } from "./routes/results";
 import { integrityRouter } from "./routes/integrity";
 import { votingRouter } from "./routes/voting";
 import { commentModerationRouter, commentsRouter } from "./routes/comments";
+import { tokensRouter } from "./routes/tokens";
+import { metaRouter } from "./routes/meta";
+
+/**
+ * Every router and where it is mounted, in mount order. The OpenAPI drift test walks this table,
+ * so a route can't be added without being documented. Uploads read the raw body, so they come
+ * before the JSON parser.
+ */
+export const RAW_BODY_MOUNTS: ReadonlyArray<readonly [string, Router]> = [["/api/uploads", uploadsRouter]];
+
+export const MOUNTS: ReadonlyArray<readonly [string, Router]> = [
+  ["/api", metaRouter],
+  ["/api/auth/tokens", tokensRouter],
+  ["/api/auth", authRouter],
+  ["/api/events", eventsRouter],
+  ["/api/events", eventAdminRouter],
+  ["/api/events/:slug", judgingAdminRouter],
+  ["/api/events/:slug", assignmentsRouter],
+  ["/api/events/:slug", progressRouter],
+  ["/api/events/:slug", resultsRouter],
+  ["/api/events/:slug", integrityRouter],
+  ["/api/events/:slug", votingRouter],
+  ["/api/events/:slug", commentModerationRouter],
+  ["/api/events/:slug/teams", teamsRouter],
+  // before projectsRouter, whose "/:projectId" would otherwise swallow ".../comments"
+  ["/api/events/:slug/projects/:projectId/comments", commentsRouter],
+  ["/api/events/:slug/projects", projectsRouter],
+  ["/api/events/:slug/judges", judgingRouter],
+  ["/api/events/:slug/judging", judgeConsoleRouter],
+  ["/api/events/:slug/export", exportsRouter],
+  ["/api/invites", invitesRouter],
+  ["/api/files", filesRouter],
+];
 
 export function createApp() {
   const app = express();
@@ -32,32 +65,9 @@ export function createApp() {
   });
   app.use(cookieParser());
   app.use(loadActor);
-  // Uploads read the raw body, so they are mounted before the JSON parser.
-  app.use("/api/uploads", uploadsRouter);
+  for (const [path, router] of RAW_BODY_MOUNTS) app.use(path, router);
   app.use(express.json({ limit: "1mb" }));
-
-  app.get("/api/health", (_req, res) => {
-    res.json({ ok: true });
-  });
-
-  app.use("/api/auth", authRouter);
-  app.use("/api/events", eventsRouter);
-  app.use("/api/events", eventAdminRouter);
-  app.use("/api/events/:slug", judgingAdminRouter);
-  app.use("/api/events/:slug", assignmentsRouter);
-  app.use("/api/events/:slug", progressRouter);
-  app.use("/api/events/:slug", resultsRouter);
-  app.use("/api/events/:slug", integrityRouter);
-  app.use("/api/events/:slug", votingRouter);
-  app.use("/api/events/:slug", commentModerationRouter);
-  app.use("/api/events/:slug/teams", teamsRouter);
-  app.use("/api/events/:slug/projects/:projectId/comments", commentsRouter);
-  app.use("/api/events/:slug/projects", projectsRouter);
-  app.use("/api/events/:slug/judges", judgingRouter);
-  app.use("/api/events/:slug/judging", judgeConsoleRouter);
-  app.use("/api/events/:slug/export", exportsRouter);
-  app.use("/api/invites", invitesRouter);
-  app.use("/api/files", filesRouter);
+  for (const [path, router] of MOUNTS) app.use(path, router);
 
   app.use("/api", apiNotFound);
   app.use(errorHandler);

@@ -190,10 +190,12 @@ progressRouter.get("/progress", async (req, res) => {
   });
 });
 
+export const RemindBody = z.object({ judgeIds: z.array(z.uuid()).min(1).max(500) });
+
 progressRouter.post("/progress/remind", async (req, res) => {
   const event = await staffEvent(req);
   if (judgingWindow(event) === "closed") throw new HttpError(409, "judging_closed", "Judging has closed; there is nothing left to remind judges about.");
-  const { judgeIds } = z.object({ judgeIds: z.array(z.uuid()).min(1).max(500) }).parse(req.body);
+  const { judgeIds } = RemindBody.parse(req.body);
   const unique = [...new Set(judgeIds)];
   const since = new Date(Date.now() - REMIND_COOLDOWN_MS);
 
@@ -235,7 +237,7 @@ progressRouter.post("/progress/remind", async (req, res) => {
 
 // ── redistribution ──────────────────────────────────────────────────────────
 
-const RedistributeBody = z.object({
+export const RedistributeBody = z.object({
   commit: z.boolean().default(false),
   inputHash: z.string().length(64).optional(),
   seed: z.number().int().min(0).max(2 ** 31 - 1).default(1),

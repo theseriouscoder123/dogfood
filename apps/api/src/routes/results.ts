@@ -33,7 +33,7 @@ async function staffEvent(req: Request) {
   return event;
 }
 
-const OptionsBody = z.object({
+export const OptionsBody = z.object({
   lambdaJudge: z.number().min(0).max(100).optional(),
   lambdaProject: z.number().min(0).max(100).optional(),
   minReviews: z.number().int().min(1).max(20).optional(),

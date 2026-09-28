@@ -15,7 +15,7 @@ export const eventAdminRouter = Router();
 const isoDate = z.iso.datetime({ offset: true }).transform((s) => new Date(s));
 const nullableDate = isoDate.nullable();
 
-const EventFields = z.object({
+export const EventFields = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().max(500),
   tagline: z.string().trim().max(160),
@@ -33,7 +33,7 @@ const EventFields = z.object({
   maxTeamSize: z.number().int().min(1).max(50),
 });
 
-const CreateEvent = EventFields.partial({
+export const CreateEvent = EventFields.partial({
   description: true, tagline: true, location: true, overview: true, rules: true, bannerUrl: true, logoUrl: true,
   timezone: true, registrationOpensAt: true, judgingOpensAt: true, judgingClosesAt: true, maxTeamSize: true,
 }).extend({
@@ -93,9 +93,11 @@ eventAdminRouter.post("/", async (req, res) => {
   res.status(201).json({ event: { slug: event.slug, name: event.name } });
 });
 
+export const UpdateEventBody = EventFields.partial();
+
 eventAdminRouter.patch("/:slug", async (req, res) => {
   const event = await staffEvent(req);
-  const body = EventFields.partial().parse(req.body);
+  const body = UpdateEventBody.parse(req.body);
   const next = { ...event, ...body };
   assertSchedule(next);
 
@@ -131,7 +133,7 @@ eventAdminRouter.post("/:slug/register", async (req, res) => {
 
 // ── tracks ──────────────────────────────────────────────────────────────────
 
-const TrackBody = z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(2000).default("") });
+export const TrackBody = z.object({ name: z.string().trim().min(1).max(80), description: z.string().max(2000).default("") });
 
 eventAdminRouter.post("/:slug/tracks", async (req, res) => {
   const event = await staffEvent(req);
@@ -172,7 +174,7 @@ eventAdminRouter.delete("/:slug/tracks/:trackId", async (req, res) => {
 
 // ── prizes ──────────────────────────────────────────────────────────────────
 
-const PrizeBody = z.object({
+export const PrizeBody = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().max(2000).default(""),
   value: z.string().trim().max(120).default(""),
@@ -235,9 +237,11 @@ eventAdminRouter.get("/:slug/organizers", async (req, res) => {
   res.json({ organizers: rows.map((r) => r.user) });
 });
 
+export const AddOrganizerBody = z.object({ email: z.email().transform((s) => s.trim().toLowerCase()) });
+
 eventAdminRouter.post("/:slug/organizers", async (req, res) => {
   const event = await staffEvent(req);
-  const { email } = z.object({ email: z.email().transform((s) => s.trim().toLowerCase()) }).parse(req.body);
+  const { email } = AddOrganizerBody.parse(req.body);
   const result = await prisma.$transaction(async (tx) => {
     // Unknown people get a password-less account; they claim it by registering with the same email.
     const user = await tx.user.upsert({ where: { email }, update: {}, create: { email, name: email.split("@")[0]! } });
@@ -271,7 +275,7 @@ eventAdminRouter.delete("/:slug/organizers/:userId", async (req, res) => {
 
 // ── custom submission questions ─────────────────────────────────────────────
 
-const QuestionBody = z
+export const QuestionBody = z
   .object({
     label: z.string().trim().min(1).max(200),
     help: z.string().max(1000).default(""),

@@ -20,7 +20,7 @@ export const projectsRouter = Router({ mergeParams: true });
 
 const slugOf = (req: import("express").Request) => (req.params as { slug?: string }).slug;
 
-const GalleryQuery = z.object({
+export const GalleryQuery = z.object({
   q: z.string().trim().max(100).optional(),
   track: z.string().trim().max(100).optional(), // track id or its imported external id
 });
@@ -71,8 +71,8 @@ const ProjectFields = z.object({
   techTags: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20).transform((t) => [...new Set(t)]),
 });
 
-const CreateProjectBody = ProjectFields.partial().required({ title: true });
-const UpdateProjectBody = ProjectFields.partial().extend({
+export const CreateProjectBody = ProjectFields.partial().required({ title: true });
+export const UpdateProjectBody = ProjectFields.partial().extend({
   answers: z.record(z.uuid(), z.string().max(5000)).optional(), // questionId -> value; "" clears
 });
 

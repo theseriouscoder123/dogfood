@@ -79,8 +79,10 @@ export function audit(e: AuditEntry): Promise<void> {
 }
 
 /** Actor, IP and request id taken from the HTTP request. */
-export function fromRequest(req: Request): Pick<AuditEntry, "actor" | "ip" | "requestId"> {
-  return { actor: req.actor, ip: req.ip ?? null, requestId: req.requestId };
+export function fromRequest(req: Request): Pick<AuditEntry, "actor" | "actorLabel" | "ip" | "requestId"> {
+  // Changes made by a script say so in the log, and which token did it.
+  const actorLabel = req.actor && req.apiToken ? `${req.actor.email} (API token "${req.apiToken.name}")` : undefined;
+  return { actor: req.actor, actorLabel, ip: req.ip ?? null, requestId: req.requestId };
 }
 
 export async function verifyAuditChain(): Promise<{ ok: boolean; checked: number; brokenAtId?: string }> {

@@ -31,7 +31,7 @@ const slugKey = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0
 
 // ── rubric ──────────────────────────────────────────────────────────────────
 
-const CriterionBody = z
+export const CriterionBody = z
   .object({
     label: z.string().trim().min(1).max(80),
     description: z.string().trim().max(1000).default(""),
@@ -59,21 +59,22 @@ judgingAdminRouter.post("/criteria", async (req, res) => {
   res.status(201).json({ criterion: serializeCriterion(criterion) });
 });
 
+export const UpdateCriterionBody = z
+  .object({
+    label: z.string().trim().min(1).max(80),
+    description: z.string().trim().max(1000),
+    weight: z.number().gt(0).max(100),
+    minScore: z.number().int().min(0).max(100),
+    maxScore: z.number().int().min(1).max(100),
+    position: z.number().int().min(0).max(1000),
+  })
+  .partial();
+
 judgingAdminRouter.patch("/criteria/:criterionId", async (req, res) => {
   const event = await staffEvent(req);
   const current = await prisma.criterion.findFirst({ where: { id: (req.params as { criterionId: string }).criterionId, eventId: event.id } });
   if (!current) throw notFound("Criterion");
-  const body = z
-    .object({
-      label: z.string().trim().min(1).max(80),
-      description: z.string().trim().max(1000),
-      weight: z.number().gt(0).max(100),
-      minScore: z.number().int().min(0).max(100),
-      maxScore: z.number().int().min(1).max(100),
-      position: z.number().int().min(0).max(1000),
-    })
-    .partial()
-    .parse(req.body);
+  const body = UpdateCriterionBody.parse(req.body);
 
   const structural = (body.minScore !== undefined && body.minScore !== current.minScore) || (body.maxScore !== undefined && body.maxScore !== current.maxScore);
   if (structural && (await scoreCount(event.id)) > 0) throw rubricLocked();
@@ -169,7 +170,7 @@ judgingAdminRouter.get("/judges", async (req, res) => {
   });
 });
 
-const InviteBody = z.object({
+export const InviteBody = z.object({
   email: z.email().transform((e) => e.trim().toLowerCase()),
   name: z.string().trim().min(1).max(100).optional(),
   trackIds: z.array(z.uuid()).max(100).default([]),
@@ -225,12 +226,14 @@ judgingAdminRouter.post("/judges", async (req, res) => {
   res.status(201).json({ judge: { id: result.id, name: result.name, email: result.email, trackIds }, emailed });
 });
 
+export const JudgeTracksBody = z.object({ trackIds: z.array(z.uuid()).max(100) });
+
 judgingAdminRouter.patch("/judges/:userId", async (req, res) => {
   const event = await staffEvent(req);
   const userId = (req.params as { userId: string }).userId;
   const role = await prisma.eventRole.findFirst({ where: { eventId: event.id, userId, role: "judge" } });
   if (!role) throw notFound("Judge");
-  const { trackIds: requested } = z.object({ trackIds: z.array(z.uuid()).max(100) }).parse(req.body);
+  const { trackIds: requested } = JudgeTracksBody.parse(req.body);
   const trackIds = await validTracks(event.id, requested);
 
   const before = (await prisma.judgeTrack.findMany({ where: { eventId: event.id, userId } })).map((t) => t.trackId);
@@ -295,9 +298,11 @@ judgingAdminRouter.get("/conflicts", async (req, res) => {
   res.json({ conflicts: rows });
 });
 
+export const ConflictBody = z.object({ judgeId: z.uuid(), teamId: z.uuid(), note: z.string().trim().max(500).default("") });
+
 judgingAdminRouter.post("/conflicts", async (req, res) => {
   const event = await staffEvent(req);
-  const body = z.object({ judgeId: z.uuid(), teamId: z.uuid(), note: z.string().trim().max(500).default("") }).parse(req.body);
+  const body = ConflictBody.parse(req.body);
   const [judge, team] = await Promise.all([
     prisma.eventRole.findFirst({ where: { eventId: event.id, userId: body.judgeId, role: "judge" } }),
     prisma.team.findFirst({ where: { id: body.teamId, eventId: event.id } }),

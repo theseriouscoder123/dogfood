@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, LogOut, PlusCircle, Trophy } from "lucide-react";
+import { BookOpen, ChevronDown, KeyRound, LogOut, PlusCircle, Trophy } from "lucide-react";
 import { Avatar } from "./visuals";
 
 type Props = {
@@ -71,6 +71,12 @@ export function UserMenu({ user, events }: Props) {
                 <PlusCircle className="size-4 text-muted" /> Host a hackathon
               </Link>
             )}
+            <Link href="/account/tokens" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-2">
+              <KeyRound className="size-4 text-muted" /> API tokens
+            </Link>
+            <Link href="/developers" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-2">
+              <BookOpen className="size-4 text-muted" /> API reference
+            </Link>
             <button
               type="button"
               className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-danger hover:bg-danger-soft"

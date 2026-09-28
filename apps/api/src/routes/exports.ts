@@ -323,6 +323,9 @@ async function staffEvent(req: Request) {
   return event;
 }
 
+/** The downloadable files, in the order the export page lists them. */
+export const EXPORT_FILES = EXPORTS.map((x) => x.file);
+
 exportsRouter.get("/", async (req, res) => {
   const event = await staffEvent(req);
   // A file that isn't available yet (sealed ballots) is listed with the reason instead of a count.

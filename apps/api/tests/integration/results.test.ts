@@ -2,6 +2,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { api, makeEvent, makeJudge, makeReview, makeTeamWithProject, makeUser, prisma } from "./helpers";
 import { verifyAuditChain } from "../../src/audit";
+import { PublishedResults } from "../../src/openapi/schemas";
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -140,6 +141,7 @@ describe("publishing", () => {
     await s.close();
     expect((await publish()).status).toBe(200);
     const pub = await api().get(`${s.base}/results`); // anonymous
+    PublishedResults.parse(pub.body); // the documented response shape (openapi/schemas.ts) holds
     expect(pub.status).toBe(200);
     expect(pub.body.results.map((r: { project: { title: string } }) => r.project.title).indexOf("Underdog")).toBeLessThan(
       pub.body.results.map((r: { project: { title: string } }) => r.project.title).indexOf("Lucky"),

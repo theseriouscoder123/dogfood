@@ -111,6 +111,7 @@ model User {
   commentReports CommentReport[]
   uploads        Upload[]
   passwordResets PasswordReset[]
+  apiTokens      ApiToken[]
 }
 
 model Session {
@@ -566,6 +567,28 @@ model Upload {
   uploadedBy User @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([uploadedById, createdAt])
+}
+
+// Personal API token for scripts and integrations. It acts as its owner, narrowed by its scopes:
+// "read" allows GET/HEAD only, "write" allows everything else. Only a hash is stored; the token
+// itself is shown once, at creation. Tokens cannot create or revoke tokens (that needs a browser session).
+model ApiToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  name       String
+  prefix     String // first characters of the token, so people can tell their tokens apart
+  tokenHash  String    @unique
+  scopes     String[] // CHECK: non-empty subset of {read, write}
+  expiresAt  DateTime? @db.Timestamptz(3) // null = never expires
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  lastUsedIp String?
+  revokedAt  DateTime? @db.Timestamptz(3)
+  seeded     Boolean   @default(false) // demo token printed at boot; removed when SEED_DEMO=false
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model PasswordReset {

@@ -19,4 +19,6 @@ export const config = {
   mailFrom: process.env.MAIL_FROM ?? "Dogfood <no-reply@dogfood.local>",
   uploadDir: process.env.UPLOAD_DIR ?? path.resolve(process.cwd(), "uploads"),
   uploadMaxBytes: Number(process.env.UPLOAD_MAX_BYTES ?? 5 * 1024 * 1024),
+  /** Requests per minute allowed for each API token. */
+  apiTokenRateLimit: Number(process.env.API_TOKEN_RATE_LIMIT ?? 600),
 };
