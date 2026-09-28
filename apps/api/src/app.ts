@@ -23,8 +23,10 @@ import { tokensRouter } from "./routes/tokens";
 import { metaRouter } from "./routes/meta";
 import { webhooksRouter } from "./routes/webhooks";
 import { recordsAdminRouter, recordsRouter } from "./routes/records";
+import { communityRouter } from "./routes/community";
 import { eventImportRouter } from "./routes/eventImport";
 import { meRouter } from "./routes/me";
+import { usersRouter } from "./routes/users";
 import { discoverRouter } from "./routes/discover";
 import { draftGuard } from "./lib/events";
 
@@ -43,6 +45,7 @@ export const MOUNTS: ReadonlyArray<readonly [string, Router]> = [
   ["/api/auth/tokens", tokensRouter],
   ["/api/auth", authRouter],
   ["/api/me", meRouter],
+  ["/api/users", usersRouter],
   ["/api/projects", discoverRouter],
   // before every event router: unpublished events are invisible to all but their organizers
   ["/api/events/:slug", draftGuard],
@@ -57,6 +60,7 @@ export const MOUNTS: ReadonlyArray<readonly [string, Router]> = [
   ["/api/events/:slug", commentModerationRouter],
   ["/api/events/:slug", webhooksRouter],
   ["/api/events/:slug", recordsAdminRouter],
+  ["/api/events/:slug", communityRouter],
   ["/api/events/:slug/teams", teamsRouter],
   // before projectsRouter, whose "/:projectId" would otherwise swallow ".../comments"
   ["/api/events/:slug/projects/:projectId/comments", commentsRouter],

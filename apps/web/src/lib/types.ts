@@ -3,7 +3,7 @@ export type Role = "participant" | "judge" | "organizer";
 export type SubmissionWindow = "not_open" | "open" | "closed";
 
 export type Me = {
-  user: { id: string; email: string; name: string; isAdmin: boolean } | null;
+  user: { id: string; email: string; name: string; isAdmin: boolean; handle: string; avatarUrl: string | null } | null;
   roles: Array<{ role: Role; event: { slug: string; name: string } }>;
 };
 
@@ -123,7 +123,7 @@ export type ProjectDetail = {
     submittedAt: string | null;
     updatedAt: string;
     track: { id: string; name: string } | null;
-    team: { id: string; name: string; members: Array<{ name: string; role: string }> };
+    team: { id: string; name: string; members: Array<{ name: string; role: string; profile: string; avatarUrl: string | null }> };
     duplicateOf?: string | null;
   };
   answers: Array<{ questionId: string; label: string; type: QuestionType; isPublic: boolean; value: string }>;
@@ -482,7 +482,7 @@ export type CommentView = {
   id: string;
   state: "visible" | "hidden" | "deleted";
   body: string | null;
-  author: { name: string; badges: Array<"team" | "organizer"> } | null;
+  author: { name: string; profile: string; avatarUrl: string | null; badges: Array<"team" | "organizer"> } | null;
   createdAt: string;
   editedAt: string | null;
   mine: boolean;
@@ -568,6 +568,7 @@ export type WebhookEndpoint = {
   url: string;
   description: string;
   eventTypes: string[];
+  format: "standard" | "slack" | "discord";
   active: boolean;
   disabledReason: string | null;
   consecutiveFailures: number;
@@ -649,3 +650,21 @@ export type RecordSummary = {
   event?: { slug: string; name: string; logoUrl: string | null };
 };
 export type RecordsAdmin = { issuable: boolean; judgingClosesAt: string | null; resultsPublished: boolean; peoplesChoicePublished: boolean; records: RecordSummary[] };
+
+// ── profiles ──
+export type MyProfile = {
+  id: string; email: string; name: string; handle: string; headline: string; bio: string; avatarUrl: string | null; location: string;
+  website: string | null; githubUrl: string | null; linkedinUrl: string | null; skills: string[]; hasPassword: boolean; createdAt: string;
+};
+export type PublicProfile = {
+  user: { id: string; name: string; handle: string; headline: string; bio: string; avatarUrl: string | null; location: string; website: string | null; githubUrl: string | null; linkedinUrl: string | null; skills: string[]; joinedAt: string };
+  stats: { hackathons: number; projects: number; podiums: number; judged: number };
+  history: Array<{
+    event: { slug: string; name: string; logoUrl: string | null; endedAt: string };
+    roles: Array<"participant" | "judge" | "organizer">;
+    team: string | null;
+    project: { id: string; title: string; tagline: string; thumbnailUrl: string | null } | null;
+    placement: { rank: number; of: number } | null;
+  }>;
+  certificates: Array<{ id: string; type: "judge_participation" | "participation"; issuedAt: string; event: { slug: string; name: string } }>;
+};

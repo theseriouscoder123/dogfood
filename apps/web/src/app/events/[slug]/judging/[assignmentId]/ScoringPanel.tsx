@@ -233,7 +233,7 @@ export function ScoringPanel({ slug, data }: { slug: string; data: JudgeAssignme
             }}
             rows={4}
             maxLength={5000}
-            placeholder="What stood out? What would make it better? Organizers see this, and it may be shared with the team after results."
+            placeholder="What stood out? What would make it better?"
             className={inputClass}
           />
         </label>

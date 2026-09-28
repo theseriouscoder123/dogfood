@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Award, BookOpen, ChevronDown, KeyRound, LogOut, PlusCircle, Trophy, Upload } from "lucide-react";
+import { Award, BookOpen, ChevronDown, KeyRound, LayoutDashboard, LogOut, PlusCircle, Settings, Trophy, Upload, UserRound } from "lucide-react";
 import { Avatar } from "./visuals";
 
 type Props = {
-  user: { name: string; email: string; isAdmin: boolean };
+  user: { name: string; email: string; isAdmin: boolean; handle: string; avatarUrl: string | null };
   events: Array<{ slug: string; name: string; roles: string[] }>;
 };
 
@@ -38,18 +38,32 @@ export function UserMenu({ user, events }: Props) {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-2.5 transition hover:border-line-strong"
       >
-        <Avatar name={user.name} size={28} className="ring-0" />
+        <Avatar name={user.name} src={user.avatarUrl} size={28} className="ring-0" />
         <span className="hidden max-w-32 truncate text-sm font-semibold sm:block">{user.name.split(" ")[0]}</span>
         <ChevronDown className="size-4 text-muted" />
       </button>
       {open && (
         <div role="menu" className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-line bg-surface shadow-lift">
-          <div className="border-b border-line px-4 py-3">
-            <div className="flex items-center gap-2 font-semibold">
-              {user.name}
-              {user.isAdmin && <span className="rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-bg">Admin</span>}
+          <Link href={`/u/${user.handle}`} onClick={() => setOpen(false)} className="flex items-center gap-3 border-b border-line px-4 py-3 hover:bg-surface-2">
+            <Avatar name={user.name} src={user.avatarUrl} size={38} className="ring-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 font-semibold">
+                <span className="truncate">{user.name}</span>
+                {user.isAdmin && <span className="rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-bg">Admin</span>}
+              </div>
+              <div className="truncate text-xs text-muted">@{user.handle}</div>
             </div>
-            <div className="truncate text-xs text-muted">{user.email}</div>
+          </Link>
+          <div className="border-b border-line py-2">
+            {[
+              { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+              { href: `/u/${user.handle}`, icon: UserRound, label: "Your profile" },
+              { href: "/account/settings", icon: Settings, label: "Settings" },
+            ].map((l) => (
+              <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-2">
+                <l.icon className="size-4 text-muted" /> {l.label}
+              </Link>
+            ))}
           </div>
           {events.length > 0 && (
             <div className="border-b border-line py-2">

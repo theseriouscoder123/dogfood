@@ -141,9 +141,7 @@ export default async function ResultsPage({ params, searchParams }: { params: Pr
           <div>
             <h3 className="font-bold">How this ranking was made</h3>
             <p className="mt-1 text-muted">
-              Each project was scored by several judges on a weighted rubric. Some judges score harder than others, so each judge&apos;s leniency was estimated from the
-              projects they shared with other judges and taken out of their scores. That way no project is helped or hurt by who happened to review it. Projects marked
-              provisional had fewer reviews than planned. Computed {formatDate(data.publishedRun.computedAt)}.
+              Scores are adjusted for how strict or lenient each judge was. Provisional projects had fewer reviews than planned. Computed {formatDate(data.publishedRun.computedAt)}.
             </p>
           </div>
         </div>

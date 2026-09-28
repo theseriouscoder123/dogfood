@@ -66,8 +66,7 @@ export function VoteReviewBoard({ slug, data }: { slug: string; data: VoteReview
 
       {data.incidents.length === 0 ? (
         <EmptyState icon={<ShieldCheck className="size-5" />} title="Nothing suspicious so far">
-          Checks run over every ballot each time you open this page: shared networks, identical bursts, brand-new accounts, numbered addresses, sudden surges and votes cast
-          without opening the project.
+          No clusters, bursts or brand-new accounts in the ballots so far.
         </EmptyState>
       ) : (
         <ul className="space-y-4">
@@ -218,7 +217,7 @@ function Quarantined({ data, busy, post }: { data: VoteReview; busy: boolean; po
   const [restoring, setRestoring] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   return (
-    <Card title="Quarantined ballots" description="Kept in full and left out of the count. Restoring one needs a reason, like quarantining did." padded={false}>
+    <Card title="Quarantined ballots" description="Kept, but not counted." padded={false}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead>

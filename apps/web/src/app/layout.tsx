@@ -10,6 +10,7 @@ import { LogoMark } from "@/components/visuals";
 import { buttonClass } from "@/components/ui";
 import { FeedbackProvider } from "@/components/feedback";
 import { DesktopNav, MobileNav, type NavLink } from "@/components/SiteNav";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export const metadata: Metadata = {
   title: { default: "Dogfood · Hackathons, judged fairly", template: "%s · Dogfood" },
@@ -51,6 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <DesktopNav links={links} />
               <div className="ml-auto flex items-center gap-2">
                 <ThemeToggle />
+                {me.user && <NotificationBell />}
                 {me.user ? (
                   <UserMenu user={me.user} events={[...myEvents.values()]} />
                 ) : (

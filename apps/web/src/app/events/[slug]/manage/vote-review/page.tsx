@@ -11,10 +11,7 @@ export default async function VoteReviewPage({ params }: { params: Promise<{ slu
     <div className="space-y-6">
       <div>
         <h1 className="mb-1 text-3xl font-extrabold">Vote review</h1>
-        <p className="max-w-3xl text-sm text-muted">
-          Patterns that look like ballot stuffing or coordinated voting. Each one on its own has innocent explanations, so incidents are ranked by how many independent signals
-          agree. Nothing is removed automatically: quarantined ballots are kept, left out of the count, and can be restored.
-        </p>
+        <p className="max-w-3xl text-sm text-muted">Possible ballot stuffing, ranked by how many independent signals agree.</p>
       </div>
       <VoteReviewBoard slug={slug} data={data} />
     </div>

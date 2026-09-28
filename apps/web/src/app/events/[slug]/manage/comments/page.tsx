@@ -13,10 +13,7 @@ export default async function CommentsModerationPage({ params, searchParams }: {
     <div className="space-y-6">
       <div>
         <h1 className="mb-1 text-3xl font-extrabold">Comments</h1>
-        <p className="max-w-3xl text-sm text-muted">
-          Reported comments land here. Three reports from established accounts hide a comment automatically until you look at it. Hiding is reversible and needs a reason;
-          everything is in the audit log.
-        </p>
+        <p className="max-w-3xl text-sm text-muted">Three reports from established accounts hide a comment until you review it.</p>
       </div>
       <ModerationBoard slug={slug} data={data} filter={f as "reported" | "hidden" | "recent"} />
     </div>

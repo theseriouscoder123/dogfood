@@ -14,10 +14,7 @@ export default async function IntegrityPage({ params }: { params: Promise<{ slug
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="mb-1 text-3xl font-extrabold">Review integrity</h1>
-          <p className="max-w-3xl text-sm text-muted">
-            Statistical checks that point at reviews worth a second look: scores that contradict their comments, judges who rate everything alike, reviews submitted in
-            seconds. They never change a score; you decide what, if anything, to do.
-          </p>
+          <p className="max-w-3xl text-sm text-muted">Reviews worth a second look.</p>
         </div>
         {data.summary.reviewsChecked > 0 && (
           <a href={`/api/events/${encodeURIComponent(slug)}/normalization/report.md`} download className={buttonClass("secondary", "sm")}>

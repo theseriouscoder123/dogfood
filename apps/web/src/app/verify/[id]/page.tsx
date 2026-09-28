@@ -116,7 +116,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
         </div>
       </Card>
 
-      <Card title="Check it yourself" description="Don't take this page's word for it. The signature can be checked with nothing but the public key.">
+      <Card title="Check it yourself" description="With nothing but the public key.">
         <ol className="space-y-4 text-sm">
           <li>
             <p className="font-semibold">With the verifier in the Dogfood repository (Node 18+, no packages)</p>

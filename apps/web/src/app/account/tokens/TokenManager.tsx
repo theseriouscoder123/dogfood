@@ -58,7 +58,7 @@ export function TokenManager({ initial, email }: { initial: ApiTokenList; email:
     <>
       {created && <NewToken secret={created.secret} name={created.token.name} onDone={() => setCreated(null)} />}
 
-      <Card title="Create a token" description={`Signed in as ${email}. The token acts as you, in every event you have a role in.`}>
+      <Card title="Create a token" description={`Signed in as ${email}`}>
         <form onSubmit={create} className="space-y-5">
           <Field label="Name" hint="So you know what to revoke later, e.g. “Results export (CI)”." required>
             <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required placeholder="Results export (CI)" />
@@ -140,11 +140,6 @@ export function TokenManager({ initial, email }: { initial: ApiTokenList; email:
         )}
       </Card>
 
-      <p className="flex items-start gap-2 text-xs text-muted">
-        <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-        Tokens can&apos;t vote, comment, or create other tokens: those need you, signed in here. Every change a token makes is recorded in the event&apos;s audit log under its
-        name.
-      </p>
     </>
   );
 }

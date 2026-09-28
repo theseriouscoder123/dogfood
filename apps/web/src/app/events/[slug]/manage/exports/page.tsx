@@ -73,11 +73,7 @@ export default async function ExportsPage({ params }: { params: Promise<{ slug: 
       <Card>
         <p className="flex items-start gap-3 text-sm text-muted">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-success" />
-          <span>
-            Files are UTF-8 with a header row. Cells that start with <code className="font-mono">=</code>, <code className="font-mono">+</code>,{" "}
-            <code className="font-mono">-</code> or <code className="font-mono">@</code> get a leading apostrophe so a spreadsheet never runs them as formulas. Every
-            download is recorded in the audit log.
-          </span>
+          <span>UTF-8 CSV. Downloads are logged.</span>
         </p>
       </Card>
     </div>

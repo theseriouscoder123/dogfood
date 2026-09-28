@@ -11,10 +11,7 @@ export default async function CertificatesPage({ params }: { params: Promise<{ s
     <div className="space-y-6">
       <div>
         <h1 className="mb-1 text-3xl font-extrabold">Certificates &amp; records</h1>
-        <p className="max-w-3xl text-sm text-muted">
-          Signed, publicly verifiable records: one for every judge who submitted a review, and a certificate for every member of a submitted project. Each carries an Ed25519
-          signature and a QR link that anyone can check, so a certificate can&apos;t be forged or quietly edited.
-        </p>
+        <p className="max-w-3xl text-sm text-muted">For judges and participants. Anyone can verify them.</p>
       </div>
       <CertificatesManager slug={slug} data={data} />
     </div>

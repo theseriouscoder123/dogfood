@@ -11,6 +11,7 @@ import { seedShowcase } from "./showcase";
 import { DEMO_JUDGE_EMAIL, DEMO_VOTER_EMAIL, JUDGING_DEMO_SLUG, seedJudgingDemo } from "./judgingDemo";
 import { enqueuePing } from "../webhooks/outbox";
 import { issuable, issueRecords } from "../records/issue";
+import { notify, type Note } from "../notifications/notify";
 
 const DEMO_PASSWORD = "dogfood2026";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "admin@dogfood.local").toLowerCase();
@@ -50,6 +51,85 @@ async function seedDemoWebhooks(createdById: string) {
       await enqueuePing(tx, hook, hook.id);
     }
   });
+}
+
+/** Announcements on the live events, and a lively team finder on the demo jam. Runs once per install. */
+async function seedDemoCommunity(organizerId: string, sampleEventId: string) {
+  if ((await prisma.announcement.count()) > 0) return;
+  const [sprint, jam] = await Promise.all([prisma.event.findUnique({ where: { slug: JUDGING_DEMO_SLUG } }), prisma.event.findUnique({ where: { slug: "dogfood-demo-jam" } })]);
+  const ago = (h: number) => new Date(Date.now() - h * 3_600_000);
+  if (sprint) {
+    await prisma.announcement.createMany({
+      data: [
+        { eventId: sprint.id, authorId: organizerId, title: "Judging is open", body: "Judges: your queue is on the **Judging** tab. Aim to finish two days before the deadline so we have time for a second look at close calls.", createdAt: ago(40), updatedAt: ago(40) },
+        { eventId: sprint.id, authorId: organizerId, title: "People's Choice voting is live", body: "Everyone can vote for up to three projects. Voting closes when judging does. Results go up after we review the ballots.", pinned: true, createdAt: ago(30), updatedAt: ago(30) },
+      ],
+    });
+  }
+  if (jam) {
+    await prisma.announcement.createMany({
+      data: [
+        { eventId: jam.id, authorId: organizerId, title: "Welcome, builders", body: "Form a team of up to four (or go solo), then start your project from the **My team** tab. Use **Find a team** if you're looking for people.", pinned: true, createdAt: ago(20), updatedAt: ago(20) },
+        { eventId: jam.id, authorId: organizerId, title: "Mentor office hours", body: "Mentors are on call every evening 18:00–20:00 UTC. Bring a question, a bug, or a half-formed idea.", createdAt: ago(6), updatedAt: ago(6) },
+      ],
+    });
+    // A few sample-event builders looking for teams, and one team with room.
+    const people = await prisma.eventRole.findMany({ where: { eventId: sampleEventId, role: "participant" }, take: 5, skip: 10, select: { userId: true } });
+    const posts = [
+      { note: "Backend dev, happiest with Go and Postgres. Would love to pair with a designer.", skills: ["Go", "PostgreSQL", "Docker"] },
+      { note: "Product designer. I can take an idea to a clickable prototype in an evening.", skills: ["Figma", "UX research", "Prototyping"] },
+      { note: "ML engineer, into small models that run offline. Looking for a climate or health idea.", skills: ["Python", "PyTorch", "ONNX"] },
+      { note: "First hackathon! Frontend (React), keen to learn from a team that ships.", skills: ["React", "TypeScript", "CSS"] },
+    ];
+    for (const [i, person] of people.slice(0, 4).entries()) {
+      await prisma.eventRole.upsert({ where: { eventId_userId_role: { eventId: jam.id, userId: person.userId, role: "participant" } }, update: {}, create: { eventId: jam.id, userId: person.userId, role: "participant" } });
+      await prisma.finderPost.create({ data: { eventId: jam.id, userId: person.userId, kind: "individual", ...posts[i]!, createdAt: ago(10 - i * 2), updatedAt: ago(10 - i * 2) } });
+    }
+    const captain = people[4];
+    if (captain) {
+      await prisma.eventRole.upsert({ where: { eventId_userId_role: { eventId: jam.id, userId: captain.userId, role: "participant" } }, update: {}, create: { eventId: jam.id, userId: captain.userId, role: "participant" } });
+      const team = await prisma.team.create({ data: { eventId: jam.id, name: "Night Owls", createdById: captain.userId } });
+      await prisma.teamMember.create({ data: { teamId: team.id, eventId: jam.id, userId: captain.userId, role: "captain" } });
+      await prisma.finderPost.create({ data: { eventId: jam.id, userId: captain.userId, kind: "team", note: "Building a study-group matcher for night-shift students. Need a designer and someone comfortable with Postgres.", skills: ["Figma", "PostgreSQL"], createdAt: ago(3), updatedAt: ago(3) } });
+    }
+  }
+}
+
+/** Filled-in profiles for the demo accounts (only where the person hasn't written their own). */
+async function seedDemoProfiles() {
+  const profiles = [
+    { email: "priya1@example.org", name: "Priya Sharma", headline: "Full-stack developer, climate-tech nerd", location: "Pune, India", bio: "I build small tools that save people time. Lately: Rust, maps and anything that works offline.", skills: ["TypeScript", "Rust", "PostgreSQL", "Figma"], githubUrl: "https://github.com/priya-builds", website: "https://priya.dev" },
+    { email: DEMO_JUDGE_EMAIL, headline: "Staff engineer, developer tools", location: "Berlin", bio: "Fifteen years of build systems and CI. I judge for craft: does it work, is it clear, would I use it on Monday?", skills: ["Go", "Kubernetes", "Developer experience"], githubUrl: "https://github.com/judge-demo" },
+    { email: ORGANIZER_EMAIL, name: "Morgan Lee", headline: "Community lead, Dogfood Hack Club", location: "Remote", bio: "I run hackathons for students and early-career developers. Four a year, all judged in the open.", skills: ["Community", "Events", "Python"] },
+  ];
+  for (const { email, ...p } of profiles) {
+    const u = await prisma.user.findUnique({ where: { email }, select: { id: true, bio: true } });
+    if (u && !u.bio) await prisma.user.update({ where: { id: u.id }, data: p });
+  }
+}
+
+/** A few notifications so the demo accounts' bells aren't empty on a fresh install. Keys make it idempotent. */
+async function seedDemoNotifications(sampleEventId: string) {
+  const [org, judge, priya, sprint, sample] = await Promise.all([
+    prisma.user.findUnique({ where: { email: ORGANIZER_EMAIL } }),
+    prisma.user.findUnique({ where: { email: DEMO_JUDGE_EMAIL } }),
+    prisma.user.findUnique({ where: { email: "priya1@example.org" } }),
+    prisma.event.findUnique({ where: { slug: JUDGING_DEMO_SLUG } }),
+    prisma.event.findUnique({ where: { id: sampleEventId } }),
+  ]);
+  if (!org || !judge || !priya || !sprint || !sample) return;
+  const cert = await prisma.signedRecord.findFirst({ where: { eventId: sample.id, userId: priya.id, supersededById: null } });
+  const notes: Note[] = [
+    { userId: judge.id, eventId: sprint.id, category: "judging", title: "6 projects to review", body: sprint.name, url: `/events/${sprint.slug}/judging`, key: "demo:judge:assigned" },
+    { userId: judge.id, eventId: sprint.id, category: "reminders", title: `Judging for ${sprint.name} closes soon`, body: "3 reviews left.", url: `/events/${sprint.slug}/judging`, key: "demo:judge:reminder" },
+    { userId: org.id, eventId: sprint.id, category: "organizer", title: "Suspicious voting in Spring Build Sprint", body: "12 ballots for one project from a single network. Review them before publishing.", url: `/events/${sprint.slug}/manage/vote-review`, key: "demo:org:votes" },
+    { userId: org.id, eventId: sprint.id, category: "organizer", title: "A webhook keeps failing", body: "CRM sync: 503 Service Unavailable. Retrying with backoff.", url: `/events/${sprint.slug}/manage/webhooks`, key: "demo:org:webhook" },
+    { userId: priya.id, eventId: sample.id, category: "results", title: `Results are out for ${sample.name}`, url: `/events/${sample.slug}/results`, key: "demo:priya:results" },
+    ...(cert ? [{ userId: priya.id, eventId: sample.id, category: "results" as const, title: `Your certificate for ${sample.name} is ready`, url: `/certificates/${cert.id}`, key: "demo:priya:cert" }] : []),
+  ];
+  // Demo notifications never email.
+  const n = await notify(prisma, notes);
+  if (n) await prisma.notification.updateMany({ where: { key: { startsWith: "demo:" } }, data: { emailWanted: false } });
 }
 
 async function main() {
@@ -124,6 +204,9 @@ async function main() {
     create: { tokenHash: sha256(DEMO_API_TOKEN), prefix: DEMO_API_TOKEN.slice(0, 10), name: "Demo (read-only)", userId: organizer.id, scopes: ["read"], seeded: true },
   });
   await seedDemoWebhooks(organizer.id);
+  await seedDemoNotifications(event.id);
+  await seedDemoProfiles();
+  await seedDemoCommunity(organizer.id, event.id);
   lines.push(`  ${"api token".padEnd(12)} Authorization: Bearer ${DEMO_API_TOKEN}   organizer, read-only`);
   console.log(["", "seeded. test logins:", ...lines, `  password for every seeded account: ${DEMO_PASSWORD}`, ""].join("\n"));
 }

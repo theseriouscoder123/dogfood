@@ -13,21 +13,21 @@ const MODES: Array<{ mode: VotingMode; title: string; icon: typeof Mail; body: s
     mode: "email",
     title: "Verified email",
     icon: Mail,
-    body: "Voters confirm their inbox with a one-time link. No account or password needed. One inbox, one ballot, even against john+2@ and j.o.h.n@gmail tricks.",
+    body: "A one-time link confirms each voter's inbox. One inbox, one ballot.",
     strength: "Recommended",
   },
   {
     mode: "invite",
     title: "Ballot codes",
     icon: Ticket,
-    body: "You hand out single-use codes (badges, tickets, a QR at the venue). You control exactly how many ballots exist.",
+    body: "Single-use codes you hand out, for in-person events.",
     strength: "Strongest",
   },
   {
     mode: "accounts",
     title: "Any account",
     icon: UserRound,
-    body: "Anyone logged in can vote. Easiest, but anyone can register extra accounts, so it leans on the anti-abuse review.",
+    body: "Anyone with an account. Easiest, and the easiest to game.",
     strength: "Weakest",
   },
 ];
@@ -93,7 +93,7 @@ export function VotingManager({ slug, data }: { slug: string; data: VotingAdmin 
         ))}
       </div>
       <p className="flex items-center gap-2 text-sm text-muted">
-        <Lock className="size-4 shrink-0" /> Per-project counts are sealed until voting closes. No screen, export or API shows them earlier, to anyone.
+        <Lock className="size-4 shrink-0" /> Counts stay sealed until voting closes.
       </p>
 
       <Card title="Settings" description={data.locked ? "People have voted, so how they vote is locked. You can still move the dates." : undefined}>
@@ -160,16 +160,6 @@ export function VotingManager({ slug, data }: { slug: string; data: VotingAdmin 
       </Card>
 
       {(mode === "invite" || data.invites.length > 0) && <InviteCodes slug={slug} data={data} />}
-
-      <Card>
-        <p className="flex items-start gap-3 text-sm text-muted">
-          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-success" />
-          <span>
-            Built in: one ballot per inbox or code, no voting for your own team, organizers and judges kept out, rate-limited sign-in links and codes, and every ballot change
-            recorded in the audit log (that it changed, never what it says).
-          </span>
-        </p>
-      </Card>
     </div>
   );
 }
@@ -193,7 +183,7 @@ function InviteCodes({ slug, data }: { slug: string; data: VotingAdmin }) {
   }
 
   return (
-    <Card title="Ballot codes" description="Each code opens one ballot, once. Codes are shown only when created: we store them hashed, like passwords.">
+    <Card title="Ballot codes" description="Single use. Codes are shown only once.">
       <form
         className="flex flex-wrap items-end gap-3"
         onSubmit={async (e) => {

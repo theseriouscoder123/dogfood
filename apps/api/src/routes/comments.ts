@@ -49,7 +49,7 @@ async function loadRows(projectId: string) {
     orderBy: { createdAt: "asc" },
     select: {
       id: true, parentId: true, body: true, createdAt: true, editedAt: true, deletedAt: true, hiddenAt: true, authorId: true,
-      author: { select: { name: true } },
+      author: { select: { id: true, name: true, handle: true, avatarUrl: true } },
     },
   });
 }
@@ -82,7 +82,7 @@ commentsRouter.get("/", async (req, res) => {
       state,
       body: visible ? c.body : null,
       author: visible
-        ? { name: c.author.name, badges: [...(teamIds.has(c.authorId) ? ["team"] : []), ...(organizerIds.has(c.authorId) ? ["organizer"] : [])] }
+        ? { name: c.author.name, profile: c.author.handle ?? c.author.id, avatarUrl: c.author.avatarUrl, badges: [...(teamIds.has(c.authorId) ? ["team"] : []), ...(organizerIds.has(c.authorId) ? ["organizer"] : [])] }
         : null,
       createdAt: c.createdAt,
       editedAt: visible ? c.editedAt : null,

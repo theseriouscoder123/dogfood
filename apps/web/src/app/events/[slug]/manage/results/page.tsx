@@ -22,10 +22,7 @@ export default async function ResultsPage({ params, searchParams }: { params: Pr
     <div className="space-y-6">
       <div>
         <h1 className="mb-1 text-3xl font-extrabold">Results</h1>
-        <p className="max-w-3xl text-sm text-muted">
-          Every judge scores a little differently. Scores here are adjusted for each judge&apos;s leniency, estimated from the projects they share with other judges, so a
-          project isn&apos;t helped or hurt by who happened to review it. Raw averages are shown alongside, so every adjustment is visible.
-        </p>
+        <p className="max-w-3xl text-sm text-muted">Adjusted for each judge&apos;s leniency. Raw averages alongside.</p>
       </div>
       {state.reviewsSubmitted === 0 ? (
         <p className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">No reviews have been submitted yet. Results appear here as judges submit.</p>

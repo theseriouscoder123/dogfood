@@ -83,3 +83,26 @@ describe("dashboard and discovery", () => {
     expect(r.body.projects[0].event.slug).toBe(ctx.event.slug);
   });
 });
+
+describe("duplicating an event", () => {
+  it("copies the setup into a new draft with the schedule shifted, and no people or projects", async () => {
+    const ctx = await makeEvent();
+    await prisma.criterion.create({ data: { eventId: ctx.event.id, key: "impact", label: "Impact", weight: 2, position: 0 } });
+    await prisma.prize.create({ data: { eventId: ctx.event.id, name: "Best in Track A", trackId: ctx.trackA.id, value: "$300" } });
+    await makeTeamWithProject(ctx.event.id, ctx.trackA.id);
+    const opens = new Date(Date.now() + 60 * 86_400_000);
+    const r = await api().post(`${ctx.base}/duplicate`).set("Cookie", ctx.organizer.cookie).send({ name: "Test Event 2027", submissionsOpenAt: opens.toISOString() });
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    const copy = await prisma.event.findUniqueOrThrow({ where: { slug: r.body.event.slug }, include: { tracks: true, prizes: { include: { track: true } }, criteria: true, projects: true, roles: true } });
+    expect(copy.publishedAt).toBeNull();
+    expect(copy.submissionsOpenAt.toISOString()).toBe(opens.toISOString());
+    expect(copy.submissionsCloseAt.getTime() - copy.submissionsOpenAt.getTime()).toBe(ctx.event.submissionsCloseAt.getTime() - ctx.event.submissionsOpenAt.getTime());
+    expect(copy.tracks.map((t) => t.name).sort()).toEqual(["Track A", "Track B"]);
+    expect(copy.prizes[0]).toMatchObject({ name: "Best in Track A", track: { name: "Track A" } });
+    expect(copy.criteria.map((c) => [c.key, Number(c.weight)])).toEqual([["impact", 2]]);
+    expect(copy.projects).toHaveLength(0);
+    expect(copy.roles.map((x) => x.role)).toEqual(["organizer"]);
+    const stranger = await makeUser();
+    expect((await api().post(`${ctx.base}/duplicate`).set("Cookie", stranger.cookie).send({ name: "Nope" })).status).toBe(403);
+  });
+});

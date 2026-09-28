@@ -82,10 +82,10 @@ export function RubricEditor({ slug, rubric }: { slug: string; rubric: Rubric })
             </Button>
           }
         >
-          Judges score every project on each criterion. Start from our five-criterion template, or add your own below.
+          Start from the template or add your own criteria.
         </EmptyState>
       ) : (
-        <Card title="Weights" description="Each criterion's share of a project's score. Drag to rebalance; nothing needs to add up to 100.">
+        <Card title="Weights" description="Relative weights; they don't need to add up to 100.">
           {/* stacked share bar */}
           <div className="mb-6 flex h-3 overflow-hidden rounded-full bg-surface-2">
             {criteria.map((c, i) => (

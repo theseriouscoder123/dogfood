@@ -131,11 +131,11 @@ export function ProjectEditor({ slug, project, tracks, questions, answers, deadl
           </div>
         </Card>
 
-        <Card title="Cover image" description="Shown on the gallery card and at the top of your project page. 16:9 works best.">
+        <Card title="Cover image" description="16:9 works best.">
           <ImageUpload value={f.thumbnailUrl} onChange={(url) => set("thumbnailUrl", url)} label="Upload a cover image" />
         </Card>
 
-        <Card title="Story" description="What it does, how you built it, what you learned. Markdown is supported.">
+        <Card title="Story" description="Markdown supported.">
           <textarea
             value={f.description}
             onChange={(e) => set("description", e.target.value)}

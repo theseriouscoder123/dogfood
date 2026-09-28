@@ -32,7 +32,11 @@ export function initials(name: string) {
   return ((parts[0]?.[0] ?? "?") + (parts.length > 1 ? parts[parts.length - 1]![0] : parts[0]?.[1] ?? "")).toUpperCase();
 }
 
-export function Avatar({ name, size = 32, className = "" }: { name: string; size?: number; className?: string }) {
+export function Avatar({ name, src, size = 32, className = "" }: { name: string; src?: string | null; size?: number; className?: string }) {
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" width={size} height={size} className={`inline-block shrink-0 rounded-full object-cover ring-2 ring-surface ${className}`} style={{ width: size, height: size }} />;
+  }
   const [a, b] = paletteFor(name);
   return (
     <span

@@ -14,6 +14,7 @@ import { checkWebhookUrl } from "../webhooks/address";
 import { newWebhookSecret } from "../webhooks/signature";
 import { enqueuePing, redeliver } from "../webhooks/outbox";
 import { MAX_ATTEMPTS, RETRY_DELAYS_MS } from "../webhooks/retry";
+import { FORMATS } from "../webhooks/chat";
 
 export const webhooksRouter = Router({ mergeParams: true });
 
@@ -39,12 +40,14 @@ export const CreateWebhookBody = z.object({
     .transform((t) => [...new Set(t)].sort())
     .default([])
     .describe("The event types to send. Empty means every type, including ones added later."),
+  format: z.enum(FORMATS).default("standard").describe("standard: signed JSON for your own code. slack or discord: a readable message for an incoming-webhook URL."),
 });
 
 export const UpdateWebhookBody = z.object({
   url: WebhookUrl.optional(),
   description: z.string().trim().max(200).optional(),
   eventTypes: CreateWebhookBody.shape.eventTypes.optional(),
+  format: z.enum(FORMATS).optional(),
   active: z.boolean().optional().describe("Switching an endpoint back on also clears its failure streak."),
 });
 
@@ -63,11 +66,12 @@ async function ownWebhook(req: Request, eventId: string) {
   return w;
 }
 
-const view = (w: { id: string; url: string; description: string; eventTypes: string[]; active: boolean; disabledReason: string | null; consecutiveFailures: number; failingSince: Date | null; previousSecretExpiresAt: Date | null; createdAt: Date }) => ({
+const view = (w: { id: string; url: string; description: string; eventTypes: string[]; format: string; active: boolean; disabledReason: string | null; consecutiveFailures: number; failingSince: Date | null; previousSecretExpiresAt: Date | null; createdAt: Date }) => ({
   id: w.id,
   url: w.url,
   description: w.description,
   eventTypes: w.eventTypes,
+  format: w.format,
   active: w.active,
   disabledReason: w.disabledReason,
   consecutiveFailures: w.consecutiveFailures,
@@ -116,7 +120,7 @@ webhooksRouter.post("/webhooks", async (req, res) => {
     await tx.$queryRaw`SELECT id FROM "Event" WHERE id = ${event.id}::uuid FOR UPDATE`; // count and insert as one step
     if ((await tx.webhook.count({ where: { eventId: event.id } })) >= MAX_WEBHOOKS_PER_EVENT)
       throw new HttpError(409, "too_many_webhooks", `An event can have up to ${MAX_WEBHOOKS_PER_EVENT} webhooks.`);
-    const w = await tx.webhook.create({ data: { eventId: event.id, url: body.url, description: body.description, eventTypes: body.eventTypes, secret, createdById: req.actor!.id } });
+    const w = await tx.webhook.create({ data: { eventId: event.id, url: body.url, description: body.description, eventTypes: body.eventTypes, format: body.format, secret, createdById: req.actor!.id } });
     await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "webhook.created", entityType: "Webhook", entityId: w.id, after: { url: w.url, eventTypes: w.eventTypes } });
     return w;
   });

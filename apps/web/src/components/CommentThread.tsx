@@ -165,11 +165,15 @@ function CommentItem({ c, canReply, act }: { c: CommentView & { replies?: Commen
     return <p className="rounded-xl bg-surface-2 px-4 py-2.5 text-sm italic text-muted">{c.state === "hidden" ? "This comment was removed by the organizers." : "This comment was deleted by its author."}</p>;
 
   return (
-    <div className="flex gap-3">
-      <Avatar name={c.author!.name} size={34} className="shrink-0" />
+    <div id={`comment-${c.id}`} className="flex scroll-mt-24 gap-3">
+      <Link href={`/u/${c.author!.profile}`} className="shrink-0">
+        <Avatar name={c.author!.name} src={c.author!.avatarUrl} size={34} />
+      </Link>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          <span className="font-semibold">{c.author!.name}</span>
+          <Link href={`/u/${c.author!.profile}`} className="font-semibold hover:text-primary">
+            {c.author!.name}
+          </Link>
           {c.author!.badges.includes("team") && <Pill tone="primary">Team</Pill>}
           {c.author!.badges.includes("organizer") && <Pill tone="dark">Organizer</Pill>}
           <span className="text-xs text-muted" title={new Date(c.createdAt).toUTCString()}>

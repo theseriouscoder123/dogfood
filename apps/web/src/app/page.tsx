@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Gavel, Layers, ShieldCheck, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Gavel, Layers, ShieldCheck, Trophy } from "lucide-react";
 import { api } from "@/lib/api";
 import { getMe } from "@/lib/session";
 import type { EventSummary } from "@/lib/types";
@@ -27,7 +27,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[1.25fr_1fr] lg:items-center">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-white/80 backdrop-blur">
-              <Sparkles className="size-3.5 text-[#ff8a5b]" /> Open source · self-hosted · no vendor lock-in
+              <span className="size-1.5 rounded-full bg-[#ff8a5b]" /> Open source · self-hosted
             </span>
             <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] sm:text-6xl">
               Build it. Ship it.
@@ -35,7 +35,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               <span className="bg-gradient-to-r from-[#8e9bff] via-[#c2a8ff] to-[#ff9a6b] bg-clip-text text-transparent">Get judged fairly.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg text-white/70">
-              Join a hackathon, form your team with a link, submit before the buzzer. Organizers get weighted rubrics, isolated judging and results you can
+              Join a hackathon, team up, ship before the deadline. Organizers get fair judging and results you can
               defend.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">

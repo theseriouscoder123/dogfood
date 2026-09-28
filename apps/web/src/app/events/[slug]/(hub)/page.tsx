@@ -20,7 +20,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
       </Card>
 
       {tracks.length > 0 && (
-        <Card title="Tracks" description="Pick the challenge your project fits best. Each track is judged by its own panel.">
+        <Card title="Tracks" description="Pick the track your project fits best.">
           <div className="grid gap-3 sm:grid-cols-2">
             {tracks.map((t) => {
               const [a, b] = paletteFor(t.name);
@@ -61,7 +61,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
       )}
 
       {criteria.length > 0 && (
-        <Card title="How projects are judged" description="Every judge scores the same weighted rubric. Scores are normalized across judges before ranking.">
+        <Card title="How projects are judged" description="How judges score projects.">
           <div className="space-y-3">
             {criteria.map((c) => {
               const pct = totalWeight ? Math.round((c.weight / totalWeight) * 100) : 0;

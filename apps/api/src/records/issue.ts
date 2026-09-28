@@ -138,7 +138,7 @@ export async function issueRecords(event: Event, audit: Omit<AuditEntry, "action
         });
         result.issued++;
       }
-      await appendAudit(tx, { ...audit, eventId: event.id, action: "records.issued", entityType: "Event", entityId: event.id, after: { ...result, kid: signer.kid } });
+      await appendAudit(tx, { ...audit, eventId: event.id, action: "records.issued", entityType: "Event", entityId: event.id, after: { ...result, kid: signer.kid, issuedAt } });
       return result;
     },
     { timeout: 60_000 },

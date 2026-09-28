@@ -54,7 +54,7 @@ export function AutoAssign({ slug, submissionsClosed }: { slug: string; submissi
   return (
     <Card
       title="Auto-assign"
-      description="Fills every project up to the target number of reviews, respecting tracks and conflicts, balancing load, and keeping judges' work overlapping so scores can be normalized."
+      description="Fill every project to the review target, within tracks and conflicts."
     >
       <div className="grid gap-4 sm:grid-cols-4">
         <Field label="Reviews per project">

@@ -126,12 +126,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
             <h3 className="text-sm font-bold">Team {p.team.name}</h3>
             <ul className="mt-3 space-y-3">
               {p.team.members.map((m, i) => (
-                <li key={i} className="flex items-center gap-3">
-                  <Avatar name={m.name} size={34} />
-                  <div>
-                    <div className="text-sm font-semibold">{m.name}</div>
-                    <div className="text-xs capitalize text-muted">{m.role}</div>
-                  </div>
+                <li key={i}>
+                  <Link href={`/u/${m.profile}`} className="group flex items-center gap-3">
+                    <Avatar name={m.name} src={m.avatarUrl} size={34} />
+                    <div>
+                      <div className="text-sm font-semibold group-hover:text-primary">{m.name}</div>
+                      <div className="text-xs capitalize text-muted">{m.role}</div>
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>

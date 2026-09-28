@@ -119,7 +119,7 @@ export function ImportWizard() {
       )}
 
       {preview && (
-        <Card title="2. What will be created" description={`A new event, “${preview.event.name}”, at /events/${preview.event.slug}. This preview ran the real import and then rolled it back.`}>
+        <Card title="2. What will be created" description={`New event at /events/${preview.event.slug}`}>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {LABELS.map(([k, label]) => (
               <div key={k} className="rounded-xl border border-line bg-surface-2/60 p-3">
@@ -128,9 +128,6 @@ export function ImportWizard() {
               </div>
             ))}
           </dl>
-          <p className="mt-4 text-xs text-muted">
-            People already on this portal are matched by email and left as they are. New accounts have no password: people claim them by registering with the same email.
-          </p>
           <Button className="mt-5" onClick={() => run(false)} disabled={pending}>
             {pending ? "Importing…" : "Import"}
           </Button>

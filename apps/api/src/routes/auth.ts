@@ -72,7 +72,8 @@ authRouter.get("/me", async (req, res) => {
     where: { userId: req.actor.id },
     select: { role: true, event: { select: { slug: true, name: true } } },
   });
-  res.json({ user: req.actor, roles: roles.map((r) => ({ role: r.role, event: r.event })) });
+  const extra = await prisma.user.findUnique({ where: { id: req.actor.id }, select: { handle: true, avatarUrl: true } });
+  res.json({ user: { ...req.actor, handle: extra?.handle ?? req.actor.id, avatarUrl: extra?.avatarUrl ?? null }, roles: roles.map((r) => ({ role: r.role, event: r.event })) });
 });
 
 // ── password reset ──────────────────────────────────────────────────────────

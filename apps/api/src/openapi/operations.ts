@@ -5,7 +5,7 @@ import { z } from "zod";
 import * as S from "./schemas";
 import { CreateTokenBody } from "../routes/tokens";
 import { ForgotBody, LinkBody, LinkVerifyBody, LoginBody, RegisterBody, ResetBody } from "../routes/auth";
-import { AddOrganizerBody, CreateEvent, PrizeBody, QuestionBody, TrackBody, UpdateEventBody } from "../routes/eventAdmin";
+import { AddOrganizerBody, CreateEvent, DuplicateEventBody, PrizeBody, QuestionBody, TrackBody, UpdateEventBody } from "../routes/eventAdmin";
 import { CreateProjectBody, GalleryQuery, UpdateProjectBody } from "../routes/projects";
 import { EmailInviteBody, InviteBody as TeamInviteBody, TeamNameBody } from "../routes/teams";
 import { CreateCommentBody, CommentsSettingsBody, EditCommentBody, HideCommentBody, ModerationQuery, ReportCommentBody } from "../routes/comments";
@@ -19,8 +19,10 @@ import { BallotBody, CreateInvitesBody, QuarantineBody, ReceiptBody, RedeemBody,
 import { EXPORT_FILES } from "../routes/exports";
 import { CreateWebhookBody, DeliveriesQuery, UpdateWebhookBody } from "../routes/webhooks";
 import { RevokeRecordBody } from "../routes/records";
+import { AnnouncementBody, FinderBody } from "../routes/community";
 import { ImportQuery } from "../routes/eventImport";
 import { DiscoverQuery } from "../routes/discover";
+import { MarkReadBody, NotificationSettingsBody, NotificationsQuery, PasswordBody, ProfileBody } from "../routes/me";
 import { EventFile } from "../portability/format";
 
 export type Method = "get" | "post" | "put" | "patch" | "delete";
@@ -47,6 +49,7 @@ export const TAGS = [
   { name: "Teams", description: "Team formation by invite link or email." },
   { name: "Projects", description: "Submissions and the public gallery. Drafts are editable until the deadline, which the API enforces." },
   { name: "Files", description: "Image uploads (banners, logos, thumbnails)." },
+  { name: "Community", description: "Organizer announcements and the team finder." },
   { name: "Comments", description: "Public comments on submitted projects." },
   { name: "Judging setup", description: "Rubric, judges, conflicts of interest." },
   { name: "Assignments", description: "Deterministic judge-to-project assignment." },
@@ -107,6 +110,9 @@ export const PARAMS: Record<string, string> = {
   webhookId: "Webhook id (UUID).",
   deliveryId: "Delivery id (UUID).",
   recordId: "Record id (UUID); also the public verification id.",
+  announcementId: "Announcement id (UUID).",
+  postId: "Team-finder post id (UUID).",
+  ref: "A person's handle, or their user id.",
 };
 
 const E = "/api/events/:slug";
@@ -133,6 +139,16 @@ export const OPERATIONS: Operation[] = [
 
   // ── you ──
   { method: "get", path: "/api/me/dashboard", tag: "Auth", summary: "Your dashboard: every event you're part of, with what matters for each of your roles", access: "signed_in" },
+  { method: "get", path: "/api/me/profile", tag: "Auth", summary: "Your profile, as you can edit it", access: "signed_in" },
+  { method: "patch", path: "/api/me/profile", tag: "Auth", summary: "Edit your profile: name, handle, headline, bio, avatar, links, skills", access: "signed_in", body: ProfileBody },
+  { method: "post", path: "/api/me/password", tag: "Auth", summary: "Change (or set) your password; signs out your other sessions", access: "signed_in", browserOnly: true, body: PasswordBody },
+  { method: "get", path: "/api/me/sessions", tag: "Auth", summary: "Your signed-in sessions", access: "signed_in", browserOnly: true },
+  { method: "post", path: "/api/me/sessions/revoke-others", tag: "Auth", summary: "Sign out everywhere else", access: "signed_in", browserOnly: true },
+  { method: "get", path: "/api/me/notifications", tag: "Auth", summary: "Your notifications, newest first (30 per page), with the unread count", access: "signed_in", query: NotificationsQuery },
+  { method: "post", path: "/api/me/notifications/read", tag: "Auth", summary: "Mark notifications read (some, or all)", access: "signed_in", body: MarkReadBody },
+  { method: "get", path: "/api/me/notification-settings", tag: "Auth", summary: "Your notification preferences and the categories you can mute", access: "signed_in" },
+  { method: "put", path: "/api/me/notification-settings", tag: "Auth", summary: "Turn email on or off, and mute categories", access: "signed_in", body: NotificationSettingsBody },
+  { method: "get", path: "/api/users/:ref", tag: "Auth", summary: "A public profile: bio, links, skills, hackathon history and certificates (never the email)", access: "public" },
   { method: "get", path: "/api/projects", tag: "Projects", summary: "Search submitted projects across every public event", access: "public", query: DiscoverQuery },
 
   // ── events ──
@@ -140,6 +156,7 @@ export const OPERATIONS: Operation[] = [
   { method: "get", path: E, tag: "Events", summary: "Event detail: dates, windows, tracks, prizes, rubric, questions, your roles", access: "public", response: S.EventDetail },
   { method: "post", path: "/api/events", tag: "Event setup", summary: "Host a hackathon: creates a draft event with you as its organizer", description: "Open to any signed-in user unless the platform sets HOSTING=admins. The event stays invisible to others until published.", access: "signed_in", body: CreateEvent, status: 201 },
   { method: "patch", path: E, tag: "Event setup", summary: "Update an event's details and dates", description: "Date changes are checked together: registration ≤ submissions open < close ≤ judging.", access: "organizer", body: UpdateEventBody },
+  { method: "post", path: `${E}/duplicate`, tag: "Event setup", summary: "Run it again: a new draft with the same setup and the schedule shifted", description: "Copies details, tracks, prizes, rubric, submission questions and organizers. No participants, projects, judges or votes.", access: "organizer", body: DuplicateEventBody, status: 201 },
   { method: "post", path: `${E}/publish`, tag: "Event setup", summary: "Publish a draft event: it becomes visible and open for registration", access: "organizer" },
   { method: "post", path: `${E}/unpublish`, tag: "Event setup", summary: "Back to draft (only while nobody has joined)", access: "organizer" },
   { method: "post", path: `${E}/register`, tag: "Teams", summary: "Register as a participant", access: "participant" },
@@ -282,6 +299,16 @@ export const OPERATIONS: Operation[] = [
   { method: "post", path: `${E}/webhooks/:webhookId/rotate-secret`, tag: "Webhooks", summary: "Rotate the signing secret (the old one keeps signing for 24 hours)", access: "organizer" },
   { method: "post", path: `${E}/webhooks/:webhookId/ping`, tag: "Webhooks", summary: "Send a test delivery (type webhook.ping)", access: "organizer", status: 201 },
   { method: "get", path: `${E}/webhooks/:webhookId/deliveries/:deliveryId`, tag: "Webhooks", summary: "One delivery: the exact payload and every attempt with its response", access: "organizer" },
+  // ── community ──
+  { method: "get", path: `${E}/announcements`, tag: "Community", summary: "The event's announcements, pinned first", access: "public" },
+  { method: "post", path: `${E}/announcements`, tag: "Community", summary: "Post an announcement (optionally notifying participants and judges)", access: "organizer", body: AnnouncementBody, status: 201 },
+  { method: "patch", path: `${E}/announcements/:announcementId`, tag: "Community", summary: "Edit or pin an announcement", access: "organizer", body: AnnouncementBody.omit({ notify: true }).partial() },
+  { method: "delete", path: `${E}/announcements/:announcementId`, tag: "Community", summary: "Delete an announcement", access: "organizer", status: 204 },
+  { method: "get", path: `${E}/team-finder`, tag: "Community", summary: "Open team-finder posts: people looking for a team, and teams with room", access: "public" },
+  { method: "put", path: `${E}/team-finder`, tag: "Community", summary: "Create or update your team-finder post", access: "participant", body: FinderBody },
+  { method: "delete", path: `${E}/team-finder`, tag: "Community", summary: "Remove your team-finder post", access: "signed_in", status: 204 },
+  { method: "post", path: `${E}/team-finder/:postId/invite`, tag: "Community", summary: "Invite someone who's looking to join your team (they get a single-use link)", access: "participant", status: 201 },
+
   // ── records ──
   { method: "get", path: `${E}/records`, tag: "Records", summary: "Issued records and certificates, and whether issuing is possible yet", access: "organizer" },
   { method: "post", path: `${E}/records/issue`, tag: "Records", summary: "Issue (or re-issue) signed records for every judge and participant", description: "Only after judging closes. Re-running re-signs only people whose facts changed; their previous record is marked superseded.", access: "organizer", status: 201 },

@@ -287,3 +287,25 @@ describe("delivery", () => {
     expect((await verifyAuditChain()).ok).toBe(true);
   });
 });
+
+describe("chat formats", () => {
+  it("send Slack and Discord endpoints a readable message instead of raw JSON", async () => {
+    const ctx = await makeEvent();
+    const slack = await addWebhook(ctx, { format: "slack" });
+    await api().post(`${ctx.base}/webhooks/${slack.id}/ping`).set("Cookie", ctx.organizer.cookie);
+    const { project, member } = await makeTeamWithProject(ctx.event.id, ctx.trackA.id, "Nightjar");
+    await api().post(`${ctx.base}/projects/${project.id}/unsubmit`).set("Cookie", member.cookie);
+    await api().post(`${ctx.base}/projects/${project.id}/submit`).set("Cookie", member.cookie);
+    await runWebhookWorkerOnce();
+    const texts = hits.map((h) => JSON.parse(h.body).text as string);
+    expect(texts).toContain("Dogfood is connected. Updates from Test Event will appear here.");
+    expect(texts.find((t) => t.startsWith("“Nightjar” was submitted to Test Event."))).toContain(`/projects/${project.id}`);
+
+    const discord = await addWebhook(ctx, { format: "discord", eventTypes: ["results.published"] });
+    hits.length = 0;
+    await api().post(`${ctx.base}/webhooks/${discord.id}/ping`).set("Cookie", ctx.organizer.cookie);
+    await runWebhookWorkerOnce();
+    expect(JSON.parse(hits[0]!.body)).toMatchObject({ content: expect.stringContaining("Dogfood is connected"), allowed_mentions: { parse: [] } });
+    expect((await api().post(`${ctx.base}/webhooks`).set("Cookie", ctx.organizer.cookie).send({ url: `${base}/x`, format: "teams" })).status).toBe(400);
+  });
+});

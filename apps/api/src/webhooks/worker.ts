@@ -7,6 +7,7 @@ import { config } from "../config";
 import { appendAudit } from "../audit";
 import { canonicalJson } from "../lib/crypto";
 import { signedHeaders } from "./signature";
+import { bodyFor } from "./chat";
 import { afterAttempt, isSuccess, nextAttemptAt } from "./retry";
 import { resolveForDelivery } from "./address";
 
@@ -63,7 +64,8 @@ async function attempt(deliveryId: string, send: Sender, now: () => Date, random
   const w = d.webhook;
   const signedAt = now();
   const secrets = [w.secret, ...(w.previousSecret && w.previousSecretExpiresAt && w.previousSecretExpiresAt > signedAt ? [w.previousSecret] : [])];
-  const body = canonicalJson(d.payload);
+  // Chat formats (Slack, Discord) get a readable message; the signature covers whatever is sent.
+  const body = bodyFor(w.format, d.payload as { type: string }, canonicalJson(d.payload));
   const result = await send(w.url, signedHeaders(secrets, d.messageId, Math.floor(signedAt.getTime() / 1000), body), body);
 
   const finished = now();

@@ -13,10 +13,7 @@ export default async function VotingPage({ params }: { params: Promise<{ slug: s
     <div className="space-y-6">
       <div>
         <h1 className="mb-1 text-3xl font-extrabold">Community voting</h1>
-        <p className="max-w-3xl text-sm text-muted">
-          A People&apos;s Choice vote, separate from the judges&apos; ranking. Each voter gets a fixed number of votes and sees the projects in their own random order. Counts stay
-          sealed until voting closes, for you too.
-        </p>
+        <p className="max-w-3xl text-sm text-muted">A community vote, separate from the judges&apos; ranking.</p>
       </div>
       <VotingResults slug={slug} window={data.window} preview={preview} />
       <VotingManager slug={slug} data={data} />

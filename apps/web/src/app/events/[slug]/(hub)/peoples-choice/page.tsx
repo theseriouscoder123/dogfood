@@ -113,10 +113,10 @@ export default async function PeoplesChoicePage({ params }: { params: Promise<{ 
       </Card>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Card title="Check your ballot" description="Enter the receipt you got when you voted to see whether your ballot was counted, exactly as you cast it.">
+        <Card title="Check your ballot" description="Paste the receipt you got when you voted.">
           <ReceiptCheck slug={slug} />
         </Card>
-        <Card title="Recount it yourself" description="Every ballot is published, anonymous, under the hash of its receipt. Nothing else identifies a voter.">
+        <Card title="Recount it yourself" description="Every ballot, anonymous, for an independent count.">
           <a href={data.ballotFile.url} download className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-sm font-semibold hover:border-line-strong">
             <Download className="size-4" /> ballots.json · {data.ballotFile.ballots} ballots
           </a>
@@ -138,7 +138,7 @@ export default async function PeoplesChoicePage({ params }: { params: Promise<{ 
         </Card>
       </div>
 
-      <Card title="Did list position matter?" description="Every voter saw the projects in their own random order. If that worked, picks spread across positions evenly.">
+      <Card title="Did list position matter?" description="Each voter saw the projects in a different random order.">
         <PositionChart check={data.positionCheck} />
         <p className={`mt-4 flex items-start gap-2 text-sm ${verdict.tone === "warn" ? "text-warn" : verdict.tone === "success" ? "text-success" : "text-muted"}`}>
           <Shuffle className="mt-0.5 size-4 shrink-0" /> {verdict.text}

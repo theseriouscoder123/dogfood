@@ -186,3 +186,30 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - `public/embed.js` is one script tag with data-attributes. It inserts the iframe and auto-sizes it from `postMessage` height updates, accepted only when they come from its own iframe and the portal's origin.
   - Tested from a real third-party origin (a host page on :5500): the gallery rendered and sized itself so the host's footer sits right below it.
   - *Manage → Embed* has options, script or iframe code, and a live preview. *Manage → Exports* gained "Full event (.json)"; admins get *Import an event* with a preview-then-import wizard. The gateway body limit was raised to 26 MB for imports.
+- **Mon · Product polish (A–G)** After T4, the product frame around the features.
+  - **Shell.** A top nav (Dashboard, Hackathons, Projects, Host a hackathon, Developers) with a portalled mobile menu. The header's backdrop-filter was trapping the fixed panel; the screenshots caught it.
+  - **Dashboard.** A role-aware home: deadlines, then your events grouped by role (organizing, judging, building).
+  - **New pages.** `/hackathons`, cross-event `/projects` search, and a footer, 404 and error pages.
+  - **Dialogs.** In-app confirm/prompt dialogs and toasts replaced all ten native `confirm`/`prompt` calls.
+- **Mon** **Open hosting.** Any signed-in user can host (`HOSTING=admins` restricts it; importing stays admin-only).
+  - New events are **drafts**, and one guard in front of every `/api/events/:slug/*` router 404s a draft for everyone but its organizers and admins, so no route can forget it.
+  - Publish anytime; unpublish only while nobody has joined.
+  - **Duplicate** copies setup, tracks, prizes, rubric, questions and organizers into a new draft with the whole schedule shifted.
+- **Mon** **Profiles.**
+  - Handles, backfilled from names in the migration and created lazily for new users. Reserved words refused; a CHECK on the format.
+  - `/u/:handle` shows a bio, links, skills, stats, hackathon history with placements, and certificates, from public events only and never the email.
+  - Settings cover profile, password (changing it signs out other sessions) and sessions. Team members and comment authors link to profiles.
+- **Mon** **Notifications.** Derived from the audit log in the same transaction, like webhooks.
+  - Types: team joins and leaves, submissions, judge invites, new assignments, results, People's Choice, certificates, comments and replies, hidden comments, a switched-off webhook, and organizer announcements.
+  - People never get notified about their own actions; muted categories are skipped.
+  - Deadline reminders (24 h and 1 h before submissions close, to teams without a submitted project; 24 h before judging closes, to judges with work left) run from the worker. A unique key makes each one fire once however often the job runs.
+  - Emails use an outbox (`emailWanted`/`emailedAt`) and respect the person's email setting.
+  - UI: a bell with an unread count, a `/notifications` page, and per-category preferences.
+- **Mon** **Webhooks.**
+  - **Slack and Discord formats:** paste an incoming-webhook URL and get one readable line per event. Discord mentions are disabled, so a project title can't ping @everyone.
+  - Create at the top of the page, with sensible chat defaults, and Test, Pause/Resume, Log and Delete on every endpoint.
+- **Mon** **Community.**
+  - Organizer **announcements** (Updates tab; pin, edit, delete; notify participants and judges).
+  - A **team finder**: people looking and teams with room. Posts drop off automatically once someone joins a team or a team fills. "Invite to team" sends a single-use join link as a notification. Posting counts as registering.
+- **Mon** **Copy pass.** About 45 over-explaining helper texts cut to short product lines (including an integrity note that literally said "not AI"). The sparkle badge and eyebrow labels are gone.
+- **Mon** Demo seed: filled-in profiles for the demo accounts, notifications in their bells, announcements on the live events, and a team finder with four people looking and one team with room.

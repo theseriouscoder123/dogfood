@@ -81,7 +81,7 @@ export function JudgesManager({ slug, judges, tracks, teams, conflicts }: { slug
         ))}
       </div>
 
-      <Card title="Invite a judge" description="New people get an email to set a password. Judges only ever see projects assigned to them, in their tracks.">
+      <Card title="Invite a judge" description="Judges only see the projects assigned to them.">
         <form
           className="space-y-4"
           onSubmit={async (e) => {
@@ -217,7 +217,7 @@ export function JudgesManager({ slug, judges, tracks, teams, conflicts }: { slug
         )}
       </Card>
 
-      <Card title="Conflicts of interest" description="A judge is never assigned projects from a team they have a conflict with. Judges can also declare conflicts themselves.">
+      <Card title="Conflicts of interest" description="Judges are never assigned to these teams.">
         {conflicts.length > 0 && (
           <ul className="mb-5 divide-y divide-line">
             {conflicts.map((c) => (

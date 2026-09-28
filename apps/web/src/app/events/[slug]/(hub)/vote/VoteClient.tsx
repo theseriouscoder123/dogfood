@@ -315,10 +315,7 @@ function Ballot({ slug, data, readOnly }: { slug: string; data: VoteView; readOn
             >
               {receipt} {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4 text-muted" />}
             </button>
-            <p className="mt-2 text-xs text-muted">
-              Keep this code. After voting closes, every ballot is published anonymously by its receipt, so you can check yours was counted exactly as you cast it, and anyone can
-              recount the result.
-            </p>
+            <p className="mt-2 text-xs text-muted">Keep it to check your ballot after voting closes.</p>
           </div>
         )}
       </aside>

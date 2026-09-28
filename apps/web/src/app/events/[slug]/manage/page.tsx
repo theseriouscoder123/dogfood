@@ -4,6 +4,7 @@ import { getEvent } from "@/lib/data";
 import { phaseOf } from "@/lib/phase";
 import { Countdown } from "@/components/Countdown";
 import { Card, Pill } from "@/components/ui";
+import { DuplicateButton } from "./DuplicateButton";
 
 export default async function ManageDashboard({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -27,9 +28,11 @@ export default async function ManageDashboard({ params }: { params: Promise<{ sl
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-extrabold">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted">Everything about {event.name} at a glance.</p>
         </div>
-        <Pill tone={p.tone}>{p.label}</Pill>
+        <div className="flex items-center gap-2">
+          <Pill tone={p.tone}>{p.label}</Pill>
+          <DuplicateButton slug={slug} name={event.name} />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -48,7 +51,7 @@ export default async function ManageDashboard({ params }: { params: Promise<{ sl
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card title="Setup checklist" description={`${done} of ${setup.length} done. A complete event page gets more registrations.`}>
+        <Card title="Setup checklist" description={`${done} of ${setup.length} done`}>
           <div className="mb-4 h-2 overflow-hidden rounded-full bg-surface-2">
             <div className="h-full rounded-full bg-gradient-to-r from-primary to-[#9b6bff]" style={{ width: `${(done / setup.length) * 100}%` }} />
           </div>

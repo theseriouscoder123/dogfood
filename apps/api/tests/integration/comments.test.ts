@@ -41,7 +41,7 @@ describe("posting and reading", () => {
     expect(view.body).toMatchObject({ mode: "open", canComment: false, reason: "unauthenticated", count: 3 });
     expect(view.body.threads.map((t: { body: string }) => t.body)).toEqual(["Reminder: be kind in the comments.", "Love the offline mode. How does sync handle conflicts?"]);
     const thread = view.body.threads[1];
-    expect(thread.replies[0].author).toEqual({ name: s.member.name, badges: ["team"] });
+    expect(thread.replies[0].author).toEqual({ name: s.member.name, profile: expect.any(String), avatarUrl: null, badges: ["team"] });
     expect(view.body.threads[0].author.badges).toEqual(["organizer"]);
     expect((await post(s.url, "", "hello")).status).toBe(401);
   });

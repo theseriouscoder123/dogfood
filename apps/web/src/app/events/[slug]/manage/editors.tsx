@@ -58,7 +58,7 @@ export function DetailsForm({ slug, event }: { slug: string; event: EventDetail[
         if (await run("PATCH", `/api/events/${slug}`, f)) setSaved(true);
       }}
     >
-      <Card title="Branding" description="The banner spans the top of your event page; the logo sits on top of it.">
+      <Card title="Branding" description="Shown at the top of your event page.">
         <div className="grid gap-5 md:grid-cols-[1fr_180px]">
           <Field label="Banner" hint="Wide image, about 1600×500.">
             <div className="mt-1.5">
@@ -94,7 +94,7 @@ export function DetailsForm({ slug, event }: { slug: string; event: EventDetail[
         </div>
       </Card>
 
-      <Card title="Overview" description="The main story of your event: what to build, who it's for, what's special. Markdown supported.">
+      <Card title="Overview" description="Markdown supported.">
         <textarea
           value={f.overview}
           onChange={(e) => set("overview", e.target.value)}
@@ -105,7 +105,7 @@ export function DetailsForm({ slug, event }: { slug: string; event: EventDetail[
         />
       </Card>
 
-      <Card title="Rules" description="Eligibility, code of conduct, IP, anything participants must agree to. Markdown supported.">
+      <Card title="Rules" description="Markdown supported.">
         <textarea value={f.rules} onChange={(e) => set("rules", e.target.value)} rows={10} maxLength={50000} className={`${inputClass} font-mono text-[13px] leading-6`} />
       </Card>
 
@@ -254,7 +254,7 @@ export function PrizesEditor({ slug, prizes, tracks }: { slug: string; prizes: P
 
   return (
     <div className="space-y-4">
-      <Card title="Prizes" description="Values like “$500” are added up into the prize pool shown on your event page.">
+      <Card title="Prizes" description="Amounts add up to the prize pool.">
         {prizes.length === 0 ? (
           <p className="text-sm text-muted">No prizes yet.</p>
         ) : (
@@ -427,7 +427,7 @@ export function QuestionsEditor({ slug, questions }: { slug: string; questions: 
     <div className="space-y-4">
       <Card
         title="Your questions"
-        description="Every project has a name, tagline, story, cover image, links, track and tech tags. Add your own questions on top."
+        description="Extra questions on the submission form."
       >
         {questions.length === 0 ? (
           <EmptyState title="No custom questions yet">Add questions like “Which sponsor APIs did you use?” or “I agree to the rules”.</EmptyState>
@@ -508,7 +508,7 @@ export function OrganizersEditor({ slug, organizers, meId }: { slug: string; org
   const [notice, setNotice] = useState<string | null>(null);
   return (
     <div className="space-y-4">
-      <Card title="Organizers" description="Organizers can edit the event, see drafts, manage judging and export data.">
+      <Card title="Organizers" description="Full access to this event.">
         <ul className="divide-y divide-line">
           {organizers.map((o) => (
             <li key={o.id} className="flex items-center gap-3 py-3">
@@ -526,7 +526,7 @@ export function OrganizersEditor({ slug, organizers, meId }: { slug: string; org
           ))}
         </ul>
       </Card>
-      <Card title="Add an organizer" description="People without an account can sign up later with this email to claim it.">
+      <Card title="Add an organizer" description="They can sign up later with this email.">
         <form
           className="flex flex-col gap-2 sm:flex-row"
           onSubmit={async (e) => {

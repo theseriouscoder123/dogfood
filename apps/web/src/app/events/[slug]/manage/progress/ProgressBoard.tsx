@@ -189,7 +189,7 @@ export function ProgressBoard({ slug, initial }: { slug: string; initial: Judgin
 
       <Card
         title="Judges"
-        description="Behind means more than 20 points under a steady pace; not started is flagged once a fifth of judging has passed."
+        description="Behind: 20+ points under pace. Not started: after 20% of judging time."
         padded={false}
       >
         <div className="mt-4 flex flex-wrap items-center gap-2 border-b border-line px-5 pb-4 sm:px-6">

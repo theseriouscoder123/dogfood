@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Award, ExternalLink, FileText, Gavel, Medal } from "lucide-react";
 import { api } from "@/lib/api";
-import { getMe } from "@/lib/session";
 import type { RecordSummary } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { ordinal } from "@/lib/records";
@@ -12,18 +10,13 @@ import { LogoTile } from "@/components/visuals";
 export const metadata = { title: "My certificates" };
 
 export default async function MyRecordsPage() {
-  const me = await getMe();
-  if (!me.user) redirect("/login?next=/account/records");
   const { records } = await api<{ records: Array<RecordSummary & { event: NonNullable<RecordSummary["event"]> }> }>("/api/records/mine");
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 pt-10 sm:px-6">
+    <>
       <div>
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-primary">Account</p>
-        <h1 className="text-3xl font-extrabold">My certificates</h1>
-        <p className="mt-1.5 max-w-2xl text-sm text-muted">
-          Signed records of what you did at each hackathon. Share the verification link: anyone can check it&apos;s genuine without an account, and without trusting you or us.
-        </p>
+        <h1 className="text-3xl font-extrabold">Certificates</h1>
+        <p className="mt-1.5 max-w-2xl text-sm text-muted">Signed records of your hackathons. Anyone with the link can verify them.</p>
       </div>
       {records.length === 0 ? (
         <EmptyState icon={<Award className="size-5" />} title="Nothing yet">
@@ -66,6 +59,6 @@ export default async function MyRecordsPage() {
           ))}
         </ul>
       )}
-    </div>
+    </>
   );
 }

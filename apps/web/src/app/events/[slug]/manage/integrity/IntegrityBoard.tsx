@@ -117,10 +117,7 @@ export function IntegrityBoard({ slug, data }: { slug: string; data: IntegrityRe
       <Card>
         <p className="flex items-start gap-3 text-sm text-muted">
           <FileText className="mt-0.5 size-5 shrink-0 text-primary" />
-          <span>
-            These checks are plain statistics, not AI: every flag shows the numbers behind it, and none of them changes a score. Thresholds and reasoning are in JUDGING.md. To
-            act on a flag, exclude the judge from a results run (with a reason), reassign, or talk to them, then record your decision here.
-          </span>
+          <span>Every flag shows the numbers behind it. Nothing here changes a score.</span>
         </p>
       </Card>
     </div>

@@ -194,7 +194,7 @@ projectsRouter.get("/:projectId", async (req, res) => {
     where: { id: project.id },
     include: {
       track: { select: { id: true, name: true } },
-      team: { select: { id: true, name: true, members: { orderBy: { joinedAt: "asc" }, select: { role: true, user: { select: { name: true } } } } } },
+      team: { select: { id: true, name: true, members: { orderBy: { joinedAt: "asc" }, select: { role: true, user: { select: { id: true, name: true, handle: true, avatarUrl: true } } } } } },
     },
   });
   if (full.status === "submitted") await recordProjectView(req, event, full.id);
@@ -214,7 +214,7 @@ projectsRouter.get("/:projectId", async (req, res) => {
       repoUrl: full.repoUrl, demoUrl: full.demoUrl, videoUrl: full.videoUrl, thumbnailUrl: full.thumbnailUrl,
       techTags: full.techTags, status: full.status, submittedAt: full.submittedAt, updatedAt: full.updatedAt,
       track: full.track,
-      team: { id: full.team.id, name: full.team.name, members: full.team.members.map((m) => ({ name: m.user.name, role: m.role })) },
+      team: { id: full.team.id, name: full.team.name, members: full.team.members.map((m) => ({ name: m.user.name, role: m.role, profile: m.user.handle ?? m.user.id, avatarUrl: m.user.avatarUrl })) },
       duplicateOf: isTeamMember || access.actor?.isAdmin || access.roles.has("organizer") ? full.duplicateOfId : undefined,
     },
     canEdit: isTeamMember && window === "open",

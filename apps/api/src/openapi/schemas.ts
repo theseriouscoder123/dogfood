@@ -105,7 +105,7 @@ export const ProjectDetail = z.looseObject({
     status: z.enum(["draft", "submitted", "withdrawn"]),
     submittedAt: date.nullable(),
     updatedAt: date,
-    team: z.object({ id, name: z.string(), members: z.array(z.object({ name: z.string(), role: z.string() })) }),
+    team: z.object({ id, name: z.string(), members: z.array(z.object({ name: z.string(), role: z.string(), profile: z.string().describe("handle or user id, for /u/<profile>"), avatarUrl: z.string().nullable() })) }),
   }),
   answers: z.array(z.looseObject({ questionId: id, label: z.string(), value: z.string() })),
   canEdit: z.boolean(),

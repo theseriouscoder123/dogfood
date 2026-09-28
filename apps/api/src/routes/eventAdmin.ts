@@ -117,6 +117,52 @@ eventAdminRouter.patch("/:slug", async (req, res) => {
   res.json({ event: { slug: updated.slug, name: updated.name } });
 });
 
+export const DuplicateEventBody = z.object({
+  name: z.string().trim().min(1).max(120),
+  submissionsOpenAt: isoDate.optional().describe("When the copy's submissions open; every other date keeps its distance from it. Defaults to 30 days from now."),
+});
+
+/**
+ * Run it again: a new draft with the same details, tracks, prizes, rubric, submission questions
+ * and organizers, and the whole schedule shifted. No participants, projects, judges or votes.
+ */
+eventAdminRouter.post("/:slug/duplicate", async (req, res) => {
+  const src = await staffEvent(req);
+  const body = DuplicateEventBody.parse(req.body);
+  const opens = body.submissionsOpenAt ?? new Date(Date.now() + 30 * 86_400_000);
+  const shift = opens.getTime() - src.submissionsOpenAt.getTime();
+  const move = (d: Date | null) => (d ? new Date(d.getTime() + shift) : null);
+  const slug = await freeSlug(slugify(body.name));
+  const [tracks, prizes, criteria, questions, organizers] = await Promise.all([
+    prisma.track.findMany({ where: { eventId: src.id } }),
+    prisma.prize.findMany({ where: { eventId: src.id } }),
+    prisma.criterion.findMany({ where: { eventId: src.id } }),
+    prisma.submissionQuestion.findMany({ where: { eventId: src.id } }),
+    prisma.eventRole.findMany({ where: { eventId: src.id, role: "organizer" }, select: { userId: true } }),
+  ]);
+  const copy = await prisma.$transaction(async (tx) => {
+    const e = await tx.event.create({
+      data: {
+        slug, name: body.name, description: src.description, tagline: src.tagline, location: src.location, overview: src.overview, rules: src.rules,
+        bannerUrl: src.bannerUrl, logoUrl: src.logoUrl, timezone: src.timezone, maxTeamSize: src.maxTeamSize,
+        registrationOpensAt: move(src.registrationOpensAt), submissionsOpenAt: opens, submissionsCloseAt: move(src.submissionsCloseAt)!,
+        judgingOpensAt: move(src.judgingOpensAt), judgingClosesAt: move(src.judgingClosesAt),
+        votingOpensAt: move(src.votingOpensAt), votingClosesAt: move(src.votingClosesAt), votingMode: src.votingMode, votesPerVoter: src.votesPerVoter,
+        voterDomains: src.voterDomains, commentsMode: src.commentsMode, publishedAt: null, createdById: req.actor!.id,
+      },
+    });
+    const trackId = new Map<string, string>();
+    for (const t of tracks) trackId.set(t.id, (await tx.track.create({ data: { eventId: e.id, name: t.name, description: t.description } })).id);
+    await tx.prize.createMany({ data: prizes.map((p) => ({ eventId: e.id, name: p.name, description: p.description, value: p.value, rank: p.rank, trackId: p.trackId ? trackId.get(p.trackId)! : null })) });
+    await tx.criterion.createMany({ data: criteria.map((c) => ({ eventId: e.id, key: c.key, label: c.label, description: c.description, weight: c.weight, minScore: c.minScore, maxScore: c.maxScore, position: c.position })) });
+    await tx.submissionQuestion.createMany({ data: questions.map((q) => ({ eventId: e.id, label: q.label, help: q.help, type: q.type, options: q.options, required: q.required, isPublic: q.isPublic, position: q.position })) });
+    await tx.eventRole.createMany({ data: [...new Set([req.actor!.id, ...organizers.map((o) => o.userId)])].map((userId) => ({ eventId: e.id, userId, role: "organizer" as const })) });
+    await appendAudit(tx, { ...fromRequest(req), eventId: e.id, action: "event.create", entityType: "Event", entityId: e.id, after: { duplicateOf: src.slug, tracks: tracks.length, prizes: prizes.length, criteria: criteria.length, questions: questions.length } });
+    return e;
+  });
+  res.status(201).json({ event: { slug: copy.slug, name: copy.name } });
+});
+
 /** Make a draft event public: it appears in listings and people can register. */
 eventAdminRouter.post("/:slug/publish", async (req, res) => {
   const event = await staffEvent(req);

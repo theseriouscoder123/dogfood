@@ -84,23 +84,25 @@ enum QuestionType {
 // ── identity ────────────────────────────────────────────────────────────────
 
 model User {
-  id              String    @id @default(uuid()) @db.Uuid
-  email           String    @unique // always stored lower-cased
-  name            String
-  passwordHash    String? // null = cannot log in with a password (e.g. imported, not yet claimed)
-  emailVerifiedAt DateTime? @db.Timestamptz(3) // set when the user proves they read this inbox (sign-in link, reset link)
-  isAdmin         Boolean   @default(false) // the only global role; everything else is per event
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique // always stored lower-cased
+  name               String
+  passwordHash       String? // null = cannot log in with a password (e.g. imported, not yet claimed)
+  emailVerifiedAt    DateTime? @db.Timestamptz(3) // set when the user proves they read this inbox (sign-in link, reset link)
+  isAdmin            Boolean   @default(false) // the only global role; everything else is per event
   // public profile (never the email)
-  handle          String?   @unique // /u/<handle>; lower-case letters, digits, dashes
-  headline        String    @default("")
-  bio             String    @default("")
-  avatarUrl       String?
-  location        String    @default("")
-  website         String?
-  githubUrl       String?
-  linkedinUrl     String?
-  skills          String[]  @default([])
-  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  handle             String?   @unique // /u/<handle>; lower-case letters, digits, dashes
+  headline           String    @default("")
+  bio                String    @default("")
+  avatarUrl          String?
+  location           String    @default("")
+  website            String?
+  githubUrl          String?
+  linkedinUrl        String?
+  skills             String[]  @default([])
+  emailNotifications Boolean   @default(true)
+  mutedNotifications String[]  @default([]) // categories the person turned off
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
 
   sessions       Session[]
   eventRoles     EventRole[]
@@ -126,6 +128,9 @@ model User {
   records        SignedRecord[]        @relation("RecordSubject")
   recordsIssued  SignedRecord[]        @relation("RecordIssuer")
   eventsCreated  Event[]               @relation("EventCreator")
+  notifications  Notification[]
+  announcements  Announcement[]
+  finderPosts    FinderPost[]
 }
 
 model Session {
@@ -176,30 +181,32 @@ model Event {
   createdAt           DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime     @updatedAt @db.Timestamptz(3)
 
-  publishedRun NormalizationRun?     @relation("PublishedRun", fields: [publishedRunId], references: [id])
-  createdBy    User?                 @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  roles        EventRole[]
-  tracks       Track[]
-  prizes       Prize[]
-  teams        Team[]
-  teamMembers  TeamMember[]
-  projects     Project[]
-  criteria     Criterion[]
-  batches      AssignmentBatch[]
-  assignments  Assignment[]
-  reviews      Review[]
-  judgeTracks  JudgeTrack[]
-  conflicts    ConflictOfInterest[]
-  runs         NormalizationRun[]    @relation("EventRuns")
-  auditEntries AuditLog[]
-  questions    SubmissionQuestion[]
-  integrity    IntegrityResolution[]
-  voters       Voter[]
-  voteInvites  VoteInvite[]
-  ballots      Ballot[]
-  comments     Comment[]
-  webhooks     Webhook[]
-  records      SignedRecord[]
+  publishedRun  NormalizationRun?     @relation("PublishedRun", fields: [publishedRunId], references: [id])
+  createdBy     User?                 @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  roles         EventRole[]
+  tracks        Track[]
+  prizes        Prize[]
+  teams         Team[]
+  teamMembers   TeamMember[]
+  projects      Project[]
+  criteria      Criterion[]
+  batches       AssignmentBatch[]
+  assignments   Assignment[]
+  reviews       Review[]
+  judgeTracks   JudgeTrack[]
+  conflicts     ConflictOfInterest[]
+  runs          NormalizationRun[]    @relation("EventRuns")
+  auditEntries  AuditLog[]
+  questions     SubmissionQuestion[]
+  integrity     IntegrityResolution[]
+  voters        Voter[]
+  voteInvites   VoteInvite[]
+  ballots       Ballot[]
+  comments      Comment[]
+  webhooks      Webhook[]
+  records       SignedRecord[]
+  announcements Announcement[]
+  finderPosts   FinderPost[]
 }
 
 model EventRole {
@@ -810,6 +817,7 @@ model Webhook {
   url                     String
   description             String    @default("")
   eventTypes              String[] // empty = every event type
+  format                  String    @default("standard") // standard (signed JSON) | slack | discord (chat messages)
   secret                  String // "whsec_" + base64; signs every delivery (Standard Webhooks)
   previousSecret          String? // still signs alongside the new one until previousSecretExpiresAt, so rotation has no gap
   previousSecretExpiresAt DateTime? @db.Timestamptz(3)
@@ -919,4 +927,64 @@ model SignedRecord {
 
   @@index([eventId])
   @@index([userId])
+}
+
+// ── notifications ─────────────────────────────────────────────────────────────
+// In-app notifications, written in the same transaction as the change they report (from the
+// audit log, like webhooks). `key` makes a notification idempotent (e.g. one deadline reminder per
+// person per event). Emails go out from the worker for people who want them.
+model Notification {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  eventId     String?   @db.Uuid
+  category    String // team | submissions | judging | results | comments | organizer | reminders
+  title       String
+  body        String    @default("")
+  url         String    @default("")
+  key         String?   @unique
+  readAt      DateTime? @db.Timestamptz(3)
+  emailWanted Boolean   @default(false)
+  emailedAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([emailWanted, emailedAt])
+}
+
+// ── community (announcements, team finder) ───────────────────────────────────
+
+// Organizer updates on the event page ("Updates" tab). Posting notifies participants and judges.
+model Announcement {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventId   String   @db.Uuid
+  authorId  String?  @db.Uuid
+  title     String
+  body      String // markdown
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  event  Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+}
+
+// "Find a team": a participant looking for a team, or a team looking for people. One per person.
+model FinderPost {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventId   String   @db.Uuid
+  userId    String   @db.Uuid
+  kind      String // individual | team
+  note      String   @default("")
+  skills    String[] @default([])
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
 }

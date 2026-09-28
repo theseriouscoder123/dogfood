@@ -57,10 +57,10 @@ export function CertificatesManager({ slug, data }: { slug: string; data: Record
             </p>
             <p className="text-sm text-muted">
               {!data.issuable
-                ? `Judging closes ${formatDate(data.judgingClosesAt)}. Records describe the final picture, so they wait until then.`
+                ? `Judging closes ${formatDate(data.judgingClosesAt)}.`
                 : data.resultsPublished
-                  ? "Results are published, so certificates include each team's placement."
-                  : "Results aren't published yet. Issue now, and issue again after publishing to add placements (the old records are marked superseded)."}
+                  ? "Certificates include each team's placement."
+                  : "Placements are added once results are published."}
             </p>
           </div>
           <Button onClick={issue} disabled={!data.issuable || pending}>
@@ -72,7 +72,7 @@ export function CertificatesManager({ slug, data }: { slug: string; data: Record
 
       {data.records.length === 0 ? (
         <EmptyState icon={<Award className="size-5" />} title="No records yet">
-          Once issued, every judge and participant finds theirs under “My certificates”, with a link they can share.
+          Issued records appear here and in each person's account.
         </EmptyState>
       ) : (
         <Card

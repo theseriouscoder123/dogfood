@@ -16,11 +16,9 @@ export default async function ImportPage() {
         <EmptyState icon={<ShieldAlert className="size-5" />} title="Only admins can import events" />
       ) : (
         <>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-primary">Bring an event in</p>
           <h1 className="text-3xl font-extrabold sm:text-4xl">Import an event</h1>
           <p className="mb-8 mt-2 text-muted">
-            Upload an event file exported from any Dogfood install (Manage → Exports → Full event), or a DOGFOOD <code className="font-mono text-sm">fixtures.json</code>. You&apos;ll
-            see exactly what will be created before anything is saved. Prefer a blank start?{" "}
+            A Dogfood event file (Exports → Full event) or a DOGFOOD <code className="font-mono text-sm">fixtures.json</code>. Prefer a blank start?{" "}
             <Link href="/events/new" className="font-semibold text-primary hover:underline">
               Create an event
             </Link>
