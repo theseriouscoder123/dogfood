@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import type { Actor } from "./policy";
 import { canonicalJson, sha256 } from "./lib/crypto";
+import { enqueueForAudit } from "./webhooks/outbox";
 
 const AUDIT_LOCK_KEY = 7_331_001; // serialises appends so the chain never forks
 
@@ -61,7 +62,7 @@ export async function appendAudit(tx: Prisma.TransactionClient, e: AuditEntry): 
     requestId: e.requestId ?? null,
     createdAt: createdAt.toISOString(),
   };
-  await tx.auditLog.create({
+  const row = await tx.auditLog.create({
     data: {
       ...fields,
       before: toJson(fields.before),
@@ -70,7 +71,10 @@ export async function appendAudit(tx: Prisma.TransactionClient, e: AuditEntry): 
       prevHash,
       hash: rowHash(prevHash, fields),
     },
+    select: { id: true },
   });
+  // The audit log doubles as the event stream: webhooks are queued here, in the same transaction.
+  if (fields.eventId) await enqueueForAudit(tx, fields.eventId, { action: fields.action, entityId: fields.entityId, after: fields.after }, row.id, createdAt);
 }
 
 /** Stand-alone append for things that are not part of a larger write (e.g. refused requests). */

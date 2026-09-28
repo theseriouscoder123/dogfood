@@ -17,6 +17,7 @@ import { OptionsBody } from "../routes/results";
 import { ResolveBody } from "../routes/integrity";
 import { BallotBody, CreateInvitesBody, QuarantineBody, ReceiptBody, RedeemBody, ResolveIncidentBody, RestoreBody, RevokeInvitesBody, SettingsBody } from "../routes/voting";
 import { EXPORT_FILES } from "../routes/exports";
+import { CreateWebhookBody, DeliveriesQuery, UpdateWebhookBody } from "../routes/webhooks";
 
 export type Method = "get" | "post" | "put" | "patch" | "delete";
 
@@ -53,6 +54,7 @@ export const TAGS = [
   { name: "People's Choice", description: "Published vote results, the anonymous ballot file and receipt checks." },
   { name: "Moderation", description: "Comment moderation for organizers." },
   { name: "Exports", description: "CSV exports for every stage. Each download is audit-logged." },
+  { name: "Webhooks", description: "Signed HTTP callbacks to your systems when things happen in an event. See the Webhooks section below for payloads and verification." },
 ] as const;
 export type Tag = (typeof TAGS)[number]["name"];
 
@@ -97,6 +99,8 @@ export const PARAMS: Record<string, string> = {
   token: "The invite token from the join link.",
   name: "File name as returned by the upload, e.g. <sha256>.png",
   file: `One of: ${EXPORT_FILES.join(", ")}.`,
+  webhookId: "Webhook id (UUID).",
+  deliveryId: "Delivery id (UUID).",
 };
 
 const E = "/api/events/:slug";
@@ -254,4 +258,15 @@ export const OPERATIONS: Operation[] = [
   // ── exports ──
   { method: "get", path: `${E}/export`, tag: "Exports", summary: "Available exports with row counts", access: "organizer" },
   { method: "get", path: `${E}/export/:file`, tag: "Exports", summary: "Download one CSV (UTF-8 with BOM, formula-injection safe)", access: "organizer", produces: "text/csv" },
+
+  // ── webhooks ──
+  { method: "get", path: `${E}/webhooks`, tag: "Webhooks", summary: "Endpoints with 24-hour delivery counts, and the event types you can subscribe to", access: "organizer" },
+  { method: "post", path: `${E}/webhooks`, tag: "Webhooks", summary: "Add an endpoint", description: "The response carries the signing secret once, in `secret`.", access: "organizer", body: CreateWebhookBody, status: 201 },
+  { method: "get", path: `${E}/webhooks/:webhookId`, tag: "Webhooks", summary: "One endpoint and its latest 100 deliveries", access: "organizer", query: DeliveriesQuery },
+  { method: "patch", path: `${E}/webhooks/:webhookId`, tag: "Webhooks", summary: "Change the URL, description or event types, or switch the endpoint off and on", access: "organizer", body: UpdateWebhookBody },
+  { method: "delete", path: `${E}/webhooks/:webhookId`, tag: "Webhooks", summary: "Delete an endpoint and its delivery log", access: "organizer", status: 204 },
+  { method: "post", path: `${E}/webhooks/:webhookId/rotate-secret`, tag: "Webhooks", summary: "Rotate the signing secret (the old one keeps signing for 24 hours)", access: "organizer" },
+  { method: "post", path: `${E}/webhooks/:webhookId/ping`, tag: "Webhooks", summary: "Send a test delivery (type webhook.ping)", access: "organizer", status: 201 },
+  { method: "get", path: `${E}/webhooks/:webhookId/deliveries/:deliveryId`, tag: "Webhooks", summary: "One delivery: the exact payload and every attempt with its response", access: "organizer" },
+  { method: "post", path: `${E}/webhooks/:webhookId/deliveries/:deliveryId/redeliver`, tag: "Webhooks", summary: "Send a finished delivery again (same message id)", access: "organizer", status: 201 },
 ];

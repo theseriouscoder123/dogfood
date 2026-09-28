@@ -21,6 +21,7 @@ import { votingRouter } from "./routes/voting";
 import { commentModerationRouter, commentsRouter } from "./routes/comments";
 import { tokensRouter } from "./routes/tokens";
 import { metaRouter } from "./routes/meta";
+import { webhooksRouter } from "./routes/webhooks";
 
 /**
  * Every router and where it is mounted, in mount order. The OpenAPI drift test walks this table,
@@ -42,6 +43,7 @@ export const MOUNTS: ReadonlyArray<readonly [string, Router]> = [
   ["/api/events/:slug", integrityRouter],
   ["/api/events/:slug", votingRouter],
   ["/api/events/:slug", commentModerationRouter],
+  ["/api/events/:slug", webhooksRouter],
   ["/api/events/:slug/teams", teamsRouter],
   // before projectsRouter, whose "/:projectId" would otherwise swallow ".../comments"
   ["/api/events/:slug/projects/:projectId/comments", commentsRouter],

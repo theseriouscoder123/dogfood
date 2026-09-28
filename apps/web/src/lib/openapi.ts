@@ -40,6 +40,7 @@ export type OpenApiDoc = {
   info: { title: string; version: string; description: string };
   tags: Array<{ name: string; description: string }>;
   paths: Record<string, Record<string, OpenApiOperation>>;
+  webhooks?: Record<string, { post: { summary: string; requestBody: { content: { "application/json": { schema: JsonSchema } } } } }>;
 };
 
 export type Row = { name: string; depth: number; type: string; required: boolean; notes: string[]; description?: string };

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, CalendarClock, Download, Heart, Medal, MessageSquare, ShieldAlert, ShieldCheck, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
+import { Activity, CalendarClock, Download, Webhook, Heart, Medal, MessageSquare, ShieldAlert, ShieldCheck, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
 
 const GROUPS = [
   {
@@ -38,7 +38,10 @@ const GROUPS = [
   },
   {
     label: "Data",
-    items: [{ path: "/exports", label: "Exports", icon: Download }],
+    items: [
+      { path: "/exports", label: "Exports", icon: Download },
+      { path: "/webhooks", label: "Webhooks", icon: Webhook },
+    ],
   },
 ];
 
@@ -51,7 +54,7 @@ export function ManageNav({ base }: { base: string }) {
           <p className="hidden px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted lg:block">{g.label}</p>
           {g.items.map(({ path: p, label, icon: Icon }) => {
             const href = base + p;
-            const active = path === href;
+            const active = path === href || (p !== "" && path.startsWith(`${href}/`));
             return (
               <Link
                 key={p}

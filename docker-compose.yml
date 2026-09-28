@@ -37,6 +37,8 @@ services:
       SMTP_URL: smtp://mail:1025
       PUBLIC_BASE_URL: http://localhost:8080
       UPLOAD_DIR: /data/uploads
+      # Webhooks may not reach private addresses (SSRF guard), except the demo receiver below.
+      WEBHOOK_ALLOW_PRIVATE_HOSTS: hooks
     volumes:
       - uploads:/data/uploads
     depends_on:
@@ -47,6 +49,18 @@ services:
       interval: 3s
       timeout: 3s
       retries: 40
+
+  hooks:
+    # Demo webhook receiver: verifies signatures and lists what arrived at http://localhost:9000.
+    # It runs from the API image; delete this service (and WEBHOOK_ALLOW_PRIVATE_HOSTS) for a real event.
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["node", "dist/scripts/webhook-receiver.js"]
+    environment:
+      WEBHOOK_SECRET: whsec_ZGVtby1vbmx5LXdlYmhvb2stc2VjcmV0IQ==
+    ports:
+      - "127.0.0.1:9000:9000"
 
   web:
     build:

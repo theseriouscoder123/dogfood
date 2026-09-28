@@ -8,7 +8,8 @@ import { hashPassword } from "../auth/password";
 import { sha256 } from "../lib/crypto";
 import { importFixtures } from "./importFixtures";
 import { seedShowcase } from "./showcase";
-import { DEMO_JUDGE_EMAIL, DEMO_VOTER_EMAIL, seedJudgingDemo } from "./judgingDemo";
+import { DEMO_JUDGE_EMAIL, DEMO_VOTER_EMAIL, JUDGING_DEMO_SLUG, seedJudgingDemo } from "./judgingDemo";
+import { enqueuePing } from "../webhooks/outbox";
 
 const DEMO_PASSWORD = "dogfood2026";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "admin@dogfood.local").toLowerCase();
@@ -30,6 +31,25 @@ const DEMO_SESSIONS = [
 
 // A read-only API token for the organizer, so the API docs' curl examples work out of the box.
 const DEMO_API_TOKEN = "dfp_demo-organizer-read-only";
+
+// Two endpoints on the demo receiver (the "hooks" service): one healthy, one down, so the delivery
+// log shows successes, retries and backoff. The receiver verifies with the same secret.
+const DEMO_WEBHOOK_SECRET = process.env.DEMO_WEBHOOK_SECRET ?? "whsec_ZGVtby1vbmx5LXdlYmhvb2stc2VjcmV0IQ==";
+const DEMO_RECEIVER = "http://hooks:9000/hooks/";
+
+async function seedDemoWebhooks(createdById: string) {
+  const event = await prisma.event.findUnique({ where: { slug: JUDGING_DEMO_SLUG } });
+  if (!event || (await prisma.webhook.count({ where: { eventId: event.id, url: { startsWith: DEMO_RECEIVER } } })) > 0) return;
+  await prisma.$transaction(async (tx) => {
+    for (const w of [
+      { url: `${DEMO_RECEIVER}ok`, description: "Team chat relay (demo receiver, http://localhost:9000)", eventTypes: [] },
+      { url: `${DEMO_RECEIVER}down`, description: "CRM sync (down on purpose, to show retries)", eventTypes: ["project.submitted", "results.published"] },
+    ]) {
+      const hook = await tx.webhook.create({ data: { ...w, eventId: event.id, secret: DEMO_WEBHOOK_SECRET, createdById } });
+      await enqueuePing(tx, hook, hook.id);
+    }
+  });
+}
 
 async function main() {
   const fixture = JSON.parse(await readFile(config.fixturesPath, "utf8"));
@@ -69,7 +89,8 @@ async function main() {
   if (!config.seedDemo) {
     const { count } = await prisma.session.deleteMany({ where: { seeded: true } });
     const tokens = await prisma.apiToken.deleteMany({ where: { seeded: true } });
-    console.log(`SEED_DEMO=false: removed ${count} demo sessions and ${tokens.count} demo API tokens`);
+    const hooks = await prisma.webhook.deleteMany({ where: { url: { startsWith: DEMO_RECEIVER } } });
+    console.log(`SEED_DEMO=false: removed ${count} demo sessions, ${tokens.count} demo API tokens and ${hooks.count} demo webhooks`);
     return;
   }
 
@@ -95,6 +116,7 @@ async function main() {
     update: { userId: organizer.id, revokedAt: null, expiresAt: null, scopes: ["read"], seeded: true },
     create: { tokenHash: sha256(DEMO_API_TOKEN), prefix: DEMO_API_TOKEN.slice(0, 10), name: "Demo (read-only)", userId: organizer.id, scopes: ["read"], seeded: true },
   });
+  await seedDemoWebhooks(organizer.id);
   lines.push(`  ${"api token".padEnd(12)} Authorization: Bearer ${DEMO_API_TOKEN}   organizer, read-only`);
   console.log(["", "seeded. test logins:", ...lines, `  password for every seeded account: ${DEMO_PASSWORD}`, ""].join("\n"));
 }

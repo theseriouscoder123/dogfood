@@ -112,6 +112,7 @@ model User {
   uploads        Upload[]
   passwordResets PasswordReset[]
   apiTokens      ApiToken[]
+  webhooks       Webhook[]
 }
 
 model Session {
@@ -181,6 +182,7 @@ model Event {
   voteInvites  VoteInvite[]
   ballots      Ballot[]
   comments     Comment[]
+  webhooks     Webhook[]
 }
 
 model EventRole {
@@ -777,4 +779,78 @@ model CommentReport {
   reporter User    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@unique([commentId, reporterId]) // one report per person per comment
+}
+
+// ── webhooks (T4) ─────────────────────────────────────────────────────────────
+// An organizer's endpoint that is sent signed JSON when things happen in the event.
+// Deliveries are an outbox: appendAudit() queues them in the same transaction as the
+// change they announce, and a worker sends them afterwards with retries.
+model Webhook {
+  id                      String    @id @default(uuid()) @db.Uuid
+  eventId                 String    @db.Uuid
+  url                     String
+  description             String    @default("")
+  eventTypes              String[] // empty = every event type
+  secret                  String // "whsec_" + base64; signs every delivery (Standard Webhooks)
+  previousSecret          String? // still signs alongside the new one until previousSecretExpiresAt, so rotation has no gap
+  previousSecretExpiresAt DateTime? @db.Timestamptz(3)
+  active                  Boolean   @default(true)
+  disabledReason          String? // set when the worker turns an endpoint off (410 Gone, or too many failures in a row)
+  consecutiveFailures     Int       @default(0)
+  failingSince            DateTime? @db.Timestamptz(3) // first failure in the current run of failures
+  createdById             String?   @db.Uuid
+  createdAt               DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime  @updatedAt @db.Timestamptz(3)
+
+  event      Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy  User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries WebhookDelivery[]
+
+  @@index([eventId])
+}
+
+enum DeliveryStatus {
+  pending // waiting for its next attempt
+  succeeded
+  failed // gave up after the last retry
+}
+
+model WebhookDelivery {
+  id             String         @id @default(uuid()) @db.Uuid
+  webhookId      String         @db.Uuid
+  messageId      String // the payload's id; the same across retries and redeliveries, so receivers can de-duplicate
+  eventType      String
+  payload        Json
+  status         DeliveryStatus @default(pending)
+  attempts       Int            @default(0)
+  nextAttemptAt  DateTime       @default(now()) @db.Timestamptz(3)
+  lockedUntil    DateTime?      @db.Timestamptz(3) // claimed by a worker until then; a crashed worker's claim simply expires
+  lastAttemptAt  DateTime?      @db.Timestamptz(3)
+  lastStatusCode Int?
+  lastError      String?
+  deliveredAt    DateTime?      @db.Timestamptz(3)
+  redeliveryOfId String?        @db.Uuid
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+
+  webhook      Webhook           @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  redeliveryOf WebhookDelivery?  @relation("Redelivery", fields: [redeliveryOfId], references: [id], onDelete: SetNull)
+  redeliveries WebhookDelivery[] @relation("Redelivery")
+  attemptLog   WebhookAttempt[]
+
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+}
+
+model WebhookAttempt {
+  id           String   @id @default(uuid()) @db.Uuid
+  deliveryId   String   @db.Uuid
+  attemptedAt  DateTime @default(now()) @db.Timestamptz(3)
+  durationMs   Int
+  statusCode   Int? // null when no HTTP response arrived
+  error        String? // timeout, refused, blocked address…
+  responseBody String? // first 1,000 characters, for debugging
+
+  delivery WebhookDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId])
 }

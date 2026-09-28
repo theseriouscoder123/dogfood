@@ -3,7 +3,7 @@
   "info": {
     "title": "Dogfood API",
     "version": "1.0.0",
-    "description": "The REST API behind the Dogfood hackathon portal. The web app is built only on this API, so everything a person can do in the portal, a script can do here.\n\n## Authentication\n- **API tokens** (for scripts): create one under *Account → API tokens* and send `Authorization: Bearer dfp_…`. A token acts as you, narrowed by its scopes: `read` allows GET only, `write` allows changes. Only a hash is stored, and revoking takes effect on the next request.\n- **Sessions** (for browsers): `POST /api/auth/login` sets the `sid` cookie.\n\nPermissions are checked by the API on every request, never by the client. Voting, commenting and managing tokens need a browser session, so a token can't be turned into a bot or mint new tokens.\n\n## Rate limits\nEach token may make `API_TOKEN_RATE_LIMIT` requests a minute (600 by default). Responses carry `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`; a 429 carries `Retry-After`. Sign-in links, uploads, ballots and comments have their own limits.\n\n## Conventions\n- JSON in and out, except CSV exports, the Markdown report, and image uploads (raw bytes).\n- Ids are UUIDs. Times are ISO 8601 in UTC.\n- Errors always look like `{\"error\": {\"code\", \"message\", \"details?\"}}`. `code` is stable; branch on it, not on the message.\n- Every response has an `X-Request-Id` header; the same id is stored with audit-log entries.",
+    "description": "The REST API behind the Dogfood hackathon portal. The web app is built only on this API, so everything a person can do in the portal, a script can do here.\n\n## Authentication\n- **API tokens** (for scripts): create one under *Account → API tokens* and send `Authorization: Bearer dfp_…`. A token acts as you, narrowed by its scopes: `read` allows GET only, `write` allows changes. Only a hash is stored, and revoking takes effect on the next request.\n- **Sessions** (for browsers): `POST /api/auth/login` sets the `sid` cookie.\n\nPermissions are checked by the API on every request, never by the client. Voting, commenting and managing tokens need a browser session, so a token can't be turned into a bot or mint new tokens.\n\n## Rate limits\nEach token may make `API_TOKEN_RATE_LIMIT` requests a minute (600 by default). Responses carry `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`; a 429 carries `Retry-After`. Sign-in links, uploads, ballots and comments have their own limits.\n\n## Conventions\n- JSON in and out, except CSV exports, the Markdown report, and image uploads (raw bytes).\n- Ids are UUIDs. Times are ISO 8601 in UTC.\n- Errors always look like `{\"error\": {\"code\", \"message\", \"details?\"}}`. `code` is stable; branch on it, not on the message.\n- Every response has an `X-Request-Id` header; the same id is stored with audit-log entries.\n\n## Webhooks\nOrganizers add endpoints under *Manage → Webhooks* (or `POST /api/events/{slug}/webhooks`). Each change is queued in the same database transaction as the change itself, then POSTed as JSON. The payload types are listed under **Webhooks** in this document.\n- **Verify every request.** Signatures follow [Standard Webhooks](https://www.standardwebhooks.com): `webhook-signature` is `v1,` + base64 HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}`, keyed with the base64 part of your `whsec_…` secret. Reject timestamps more than 5 minutes old. During a secret rotation the header carries two signatures; accept either.\n- **Answer 2xx quickly.** Anything else, a timeout (10 s) or a redirect counts as a failure. Failed deliveries are retried up to 8 times over about 45 hours, with backoff. Answer 410 to unsubscribe.\n- **De-duplicate on `id`.** Delivery is at-least-once, and a redelivery reuses the id. Order is not guaranteed; use `timestamp`.\n- **Payloads are thin.** Ids, a few public fields and API links, never scores, emails or comment text. Fetch details with an API token. Ballot activity is never sent, because vote counts stay sealed until voting closes.",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -14,6 +14,2511 @@
       "url": "http://localhost:8080"
     }
   ],
+  "webhooks": {
+    "participant.registered": {
+      "post": {
+        "operationId": "webhook_participant_registered",
+        "summary": "Someone registered for the event.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "participant.registered"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "participant": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": [
+                          "userId"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "participant"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "team.created": {
+      "post": {
+        "operationId": "webhook_team_created",
+        "summary": "A team was formed.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "team.created"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "team": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "description": "null if the team no longer exists",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      },
+                      "userId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "team",
+                      "userId"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "team.member_joined": {
+      "post": {
+        "operationId": "webhook_team_member_joined",
+        "summary": "Someone joined a team through an invite.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "team.member_joined"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "team": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "description": "null if the team no longer exists",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      },
+                      "userId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "team",
+                      "userId"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "team.member_left": {
+      "post": {
+        "operationId": "webhook_team_member_left",
+        "summary": "Someone left or was removed from a team.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "team.member_left"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "team": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "description": "null if the team no longer exists",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      },
+                      "userId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "team",
+                      "userId"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "project.created": {
+      "post": {
+        "operationId": "webhook_project_created",
+        "summary": "A team started a project (as a draft).",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "project.created"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "project": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "draft",
+                                  "submitted",
+                                  "withdrawn"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "teamId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "trackId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "GET this with an API token for the full project."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "status",
+                          "teamId",
+                          "trackId",
+                          "url"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "project"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "project.updated": {
+      "post": {
+        "operationId": "webhook_project_updated",
+        "summary": "A project's details or answers changed.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "project.updated"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "project": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "draft",
+                                  "submitted",
+                                  "withdrawn"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "teamId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "trackId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "GET this with an API token for the full project."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "status",
+                          "teamId",
+                          "trackId",
+                          "url"
+                        ]
+                      },
+                      "changed": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Names of the fields that changed (answers by question id)."
+                      }
+                    },
+                    "required": [
+                      "project",
+                      "changed"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "project.submitted": {
+      "post": {
+        "operationId": "webhook_project_submitted",
+        "summary": "A project was submitted for judging.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "project.submitted"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "project": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "draft",
+                                  "submitted",
+                                  "withdrawn"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "teamId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "trackId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "GET this with an API token for the full project."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "status",
+                          "teamId",
+                          "trackId",
+                          "url"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "project"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "project.unsubmitted": {
+      "post": {
+        "operationId": "webhook_project_unsubmitted",
+        "summary": "A submitted project went back to draft before the deadline.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "project.unsubmitted"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "project": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "draft",
+                                  "submitted",
+                                  "withdrawn"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "teamId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "trackId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "GET this with an API token for the full project."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "status",
+                          "teamId",
+                          "trackId",
+                          "url"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "project"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "project.withdrawn": {
+      "post": {
+        "operationId": "webhook_project_withdrawn",
+        "summary": "A project was withdrawn.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "project.withdrawn"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "project": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "title": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "draft",
+                                  "submitted",
+                                  "withdrawn"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "teamId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "trackId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "GET this with an API token for the full project."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "status",
+                          "teamId",
+                          "trackId",
+                          "url"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "project"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "comment.created": {
+      "post": {
+        "operationId": "webhook_comment_created",
+        "summary": "A comment or reply was posted on a project.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "comment.created"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "comment": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "parentId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "projectId",
+                          "parentId"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "comment"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "comment.reported": {
+      "post": {
+        "operationId": "webhook_comment_reported",
+        "summary": "Someone reported a comment. Useful for a moderation channel.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "comment.reported"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "comment": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "projectId"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "comment",
+                      "reason"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "judge.invited": {
+      "post": {
+        "operationId": "webhook_judge_invited",
+        "summary": "An organizer invited a judge.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "judge.invited"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "judge": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": [
+                          "userId"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "judge"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "assignments.committed": {
+      "post": {
+        "operationId": "webhook_assignments_committed",
+        "summary": "An assignment plan was committed: judges have new work.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "assignments.committed"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "batch": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "assignments": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "assignments"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "batch"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "review.submitted": {
+      "post": {
+        "operationId": "webhook_review_submitted",
+        "summary": "A judge submitted a review, or revised a submitted one. Scores are not included.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "review.submitted"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "review": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "judgeId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "revised": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "projectId",
+                          "judgeId",
+                          "revised"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "review"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "results.published": {
+      "post": {
+        "operationId": "webhook_results_published",
+        "summary": "Judging results were published.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "results.published"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "run": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": [
+                          "id"
+                        ]
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "run",
+                      "url"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "results.unpublished": {
+      "post": {
+        "operationId": "webhook_results_unpublished",
+        "summary": "Published judging results were taken down.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "results.unpublished"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "peoples_choice.published": {
+      "post": {
+        "operationId": "webhook_peoples_choice_published",
+        "summary": "People's Choice results were published, with the fingerprint of the ballot file.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "peoples_choice.published"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "ballots": {
+                        "type": "integer"
+                      },
+                      "ballotsSha256": {
+                        "type": "string",
+                        "minLength": 64,
+                        "maxLength": 64
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "ballots",
+                      "ballotsSha256",
+                      "url"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "peoples_choice.unpublished": {
+      "post": {
+        "operationId": "webhook_peoples_choice_unpublished",
+        "summary": "People's Choice results were taken down.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "peoples_choice.unpublished"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "event.updated": {
+      "post": {
+        "operationId": "webhook_event_updated",
+        "summary": "The event's details or dates changed.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "event.updated"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "changed": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "changed"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
+    "webhook.ping": {
+      "post": {
+        "operationId": "webhook_webhook_ping",
+        "summary": "A test delivery, sent from the webhook's page. Always delivered, whatever the subscription.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "webhook.ping"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "webhookId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "webhookId",
+                      "message"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    }
+  },
   "tags": [
     {
       "name": "Meta",
@@ -90,6 +2595,10 @@
     {
       "name": "Exports",
       "description": "CSV exports for every stage. Each download is audit-logged."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Signed HTTP callbacks to your systems when things happen in an event. See the Webhooks section below for payloads and verification."
     }
   ],
   "paths": {
@@ -14269,6 +16778,1053 @@
               "text/csv": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/webhooks": {
+      "get": {
+        "operationId": "getEventsBySlugWebhooks",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Endpoints with 24-hour delivery counts, and the event types you can subscribe to",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postEventsBySlugWebhooks",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Add an endpoint",
+        "description": "The response carries the signing secret once, in `secret`.\n\n**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "description": "Where to POST deliveries. http(s) only; private and internal addresses are refused."
+                  },
+                  "description": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "eventTypes": {
+                    "description": "The event types to send. Empty means every type, including ones added later.",
+                    "maxItems": 19,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "participant.registered",
+                        "team.created",
+                        "team.member_joined",
+                        "team.member_left",
+                        "project.created",
+                        "project.updated",
+                        "project.submitted",
+                        "project.unsubmitted",
+                        "project.withdrawn",
+                        "comment.created",
+                        "comment.reported",
+                        "judge.invited",
+                        "assignments.committed",
+                        "review.submitted",
+                        "results.published",
+                        "results.unpublished",
+                        "peoples_choice.published",
+                        "peoples_choice.unpublished",
+                        "event.updated"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation; `details` lists the issues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/webhooks/{webhookId}": {
+      "get": {
+        "operationId": "getEventsBySlugWebhooksByWebhookId",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "One endpoint and its latest 100 deliveries",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "Webhook id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "succeeded",
+                "failed"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation; `details` lists the issues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchEventsBySlugWebhooksByWebhookId",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Change the URL, description or event types, or switch the endpoint off and on",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "Webhook id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "description": "Where to POST deliveries. http(s) only; private and internal addresses are refused."
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "eventTypes": {
+                    "description": "The event types to send. Empty means every type, including ones added later.",
+                    "maxItems": 19,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "participant.registered",
+                        "team.created",
+                        "team.member_joined",
+                        "team.member_left",
+                        "project.created",
+                        "project.updated",
+                        "project.submitted",
+                        "project.unsubmitted",
+                        "project.withdrawn",
+                        "comment.created",
+                        "comment.reported",
+                        "judge.invited",
+                        "assignments.committed",
+                        "review.submitted",
+                        "results.published",
+                        "results.unpublished",
+                        "peoples_choice.published",
+                        "peoples_choice.unpublished",
+                        "event.updated"
+                      ]
+                    }
+                  },
+                  "active": {
+                    "description": "Switching an endpoint back on also clears its failure streak.",
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation; `details` lists the issues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteEventsBySlugWebhooksByWebhookId",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete an endpoint and its delivery log",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "Webhook id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/webhooks/{webhookId}/rotate-secret": {
+      "post": {
+        "operationId": "postEventsBySlugWebhooksByWebhookIdRotateSecret",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Rotate the signing secret (the old one keeps signing for 24 hours)",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "Webhook id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/webhooks/{webhookId}/ping": {
+      "post": {
+        "operationId": "postEventsBySlugWebhooksByWebhookIdPing",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send a test delivery (type webhook.ping)",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "Webhook id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/webhooks/{webhookId}/deliveries/{deliveryId}": {
+      "get": {
+        "operationId": "getEventsBySlugWebhooksByWebhookIdDeliveriesByDeliveryId",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "One delivery: the exact payload and every attempt with its response",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "Webhook id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "description": "Delivery id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/webhooks/{webhookId}/deliveries/{deliveryId}/redeliver": {
+      "post": {
+        "operationId": "postEventsBySlugWebhooksByWebhookIdDeliveriesByDeliveryIdRedeliver",
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send a finished delivery again (same message id)",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "Webhook id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "description": "Delivery id (UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
                 }
               }
             }

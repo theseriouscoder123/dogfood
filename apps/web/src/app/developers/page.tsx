@@ -45,8 +45,8 @@ export default async function DevelopersPage() {
     <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 pt-8 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)]">
       <aside className="hidden lg:sticky lg:top-24 lg:block lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto">
         <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Guide</p>
-        {["Quick start", "Authentication", "Rate limits", "Conventions"].map((s) => (
-          <a key={s} href={`#${anchor(s)}`} className="block rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink">
+        {["Quick start", "Authentication", "Rate limits", "Conventions", "Webhooks"].map((s) => (
+          <a key={s} href={`#${s === "Quick start" ? "quick-start" : `guide-${anchor(s)}`}`} className="block rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink">
             {s}
           </a>
         ))}
@@ -56,6 +56,9 @@ export default async function DevelopersPage() {
             {t.name} <span className="text-xs tabular-nums text-muted">{t.ops.length}</span>
           </a>
         ))}
+        <a href="#webhook-events" className="flex items-center justify-between rounded-lg px-3 py-1.5 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink">
+          Webhook events <span className="text-xs tabular-nums text-muted">{Object.keys(spec.webhooks ?? {}).length}</span>
+        </a>
       </aside>
 
       <div className="min-w-0 space-y-8">
@@ -100,7 +103,7 @@ curl -H "Authorization: Bearer $TOKEN" -o results.csv http://localhost:8080/api/
             {sections.map((s) => {
               const title = s.match(/^## (.+)/)?.[1] ?? "";
               return (
-                <section key={title} id={anchor(title)} className="scroll-mt-24">
+                <section key={title} id={`guide-${anchor(title)}`} className="scroll-mt-24">
                   <Markdown className="text-sm">{s}</Markdown>
                 </section>
               );
@@ -121,8 +124,53 @@ curl -H "Authorization: Bearer $TOKEN" -o results.csv http://localhost:8080/api/
             </div>
           </section>
         ))}
+
+        {spec.webhooks && <WebhookEvents events={spec.webhooks} />}
       </div>
     </div>
+  );
+}
+
+const VERIFY = `// Node: verify a delivery before trusting it (or use any Standard Webhooks library).
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+function verify(secret, headers, rawBody) {
+  const id = headers["webhook-id"], ts = Number(headers["webhook-timestamp"]);
+  if (Math.abs(Date.now() / 1000 - ts) > 300) return false; // too old: maybe a replay
+  const key = Buffer.from(secret.slice("whsec_".length), "base64");
+  const expected = Buffer.from("v1," + createHmac("sha256", key).update(\`\${id}.\${ts}.\${rawBody}\`).digest("base64"));
+  return headers["webhook-signature"].split(" ").some((s) => s.length === expected.length && timingSafeEqual(Buffer.from(s), expected));
+}`;
+
+function WebhookEvents({ events }: { events: NonNullable<OpenApiDoc["webhooks"]> }) {
+  return (
+    <section id="webhook-events" data-tag-section className="scroll-mt-24">
+      <h2 className="text-xl font-bold">Webhook events</h2>
+      <p className="mb-3 mt-0.5 text-sm text-muted">
+        What we POST to your endpoint. Every payload shares the envelope <code className="font-mono text-xs">id</code>, <code className="font-mono text-xs">type</code>,{" "}
+        <code className="font-mono text-xs">timestamp</code>, <code className="font-mono text-xs">event</code>; <code className="font-mono text-xs">data</code> depends on the type.
+      </p>
+      <pre className="mb-4 overflow-x-auto rounded-xl bg-ink px-4 py-3 font-mono text-xs leading-relaxed text-bg">{VERIFY}</pre>
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+        {Object.entries(events).map(([type, e]) => {
+          const schema = e.post.requestBody.content["application/json"].schema;
+          const data = schema.properties?.data ?? {};
+          const rows = schemaRows(data);
+          return (
+            <details key={type} data-op={`webhook ${type} ${e.post.summary}`.toLowerCase()} className="border-b border-line last:border-b-0">
+              <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-surface-2 sm:px-5 [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex w-16 shrink-0 justify-center rounded-md border border-accent/25 bg-accent-soft py-0.5 font-mono text-[11px] font-bold uppercase text-accent">event</span>
+                <code className="font-mono text-[13px] font-semibold">{type}</code>
+                <span className="min-w-0 flex-1 text-sm text-muted">{e.post.summary}</span>
+              </summary>
+              <div className="border-t border-line bg-bg/40 px-4 py-5 sm:px-5">
+                <Block title="data">{rows.length > 0 ? <Table rows={rows} /> : <p className="text-sm text-muted">Empty object.</p>}</Block>
+              </div>
+            </details>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -209,7 +257,7 @@ function Operation({ op }: { op: Op }) {
               </li>
             ))}
             <li className="px-1 py-0.5 text-muted">
-              errors use the <a href="#conventions" className="font-semibold text-primary hover:underline">standard error shape</a>
+              errors use the <a href="#guide-conventions" className="font-semibold text-primary hover:underline">standard error shape</a>
             </li>
           </ul>
         </Block>

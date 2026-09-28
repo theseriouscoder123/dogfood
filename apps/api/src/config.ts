@@ -21,4 +21,11 @@ export const config = {
   uploadMaxBytes: Number(process.env.UPLOAD_MAX_BYTES ?? 5 * 1024 * 1024),
   /** Requests per minute allowed for each API token. */
   apiTokenRateLimit: Number(process.env.API_TOKEN_RATE_LIMIT ?? 600),
+  /** Hosts that webhooks may reach even though they're on a private network (e.g. "hooks,crm.internal"). */
+  webhookAllowPrivateHosts: (process.env.WEBHOOK_ALLOW_PRIVATE_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean),
+  /** Run the webhook delivery worker inside the API process. */
+  webhookWorker: bool("WEBHOOK_WORKER", true),
 };

@@ -559,3 +559,42 @@ export type ApiToken = {
   revokedAt: string | null;
 };
 export type ApiTokenList = { tokens: ApiToken[]; limits: { maxActive: number; lifetimesDays: Array<number | null>; scopes: ApiTokenScope[] } };
+
+// ── webhooks (T4) ──
+export type DeliveryStatus = "pending" | "succeeded" | "failed";
+export type WebhookEndpoint = {
+  id: string;
+  url: string;
+  description: string;
+  eventTypes: string[];
+  active: boolean;
+  disabledReason: string | null;
+  consecutiveFailures: number;
+  failingSince: string | null;
+  rotatingUntil: string | null;
+  createdAt: string;
+};
+export type WebhookList = {
+  webhooks: Array<WebhookEndpoint & { last24h: Record<DeliveryStatus, number>; lastAttempt: { lastAttemptAt: string; lastStatusCode: number | null; status: DeliveryStatus } | null }>;
+  eventTypes: Array<{ type: string; description: string }>;
+  limits: { maxWebhooks: number; maxAttempts: number; retryDelaysMs: number[] };
+};
+export type WebhookDelivery = {
+  id: string;
+  messageId: string;
+  eventType: string;
+  status: DeliveryStatus;
+  attempts: number;
+  nextAttemptAt: string | null;
+  lastAttemptAt: string | null;
+  lastStatusCode: number | null;
+  lastError: string | null;
+  deliveredAt: string | null;
+  redeliveryOfId: string | null;
+  createdAt: string;
+};
+export type WebhookDetail = { webhook: WebhookEndpoint; deliveries: WebhookDelivery[] };
+export type WebhookDeliveryDetail = {
+  delivery: WebhookDelivery & { payload: unknown };
+  attempts: Array<{ attemptedAt: string; durationMs: number; statusCode: number | null; error: string | null; responseBody: string | null }>;
+};

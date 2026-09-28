@@ -3,6 +3,9 @@ import { z } from "zod";
 import { ACCESS, OPERATIONS, PARAMS, TAGS, type Operation } from "./operations";
 import { ErrorResponse } from "./schemas";
 import { API_TOKEN_PREFIX } from "../auth/apiTokens";
+import { Envelope, PING_TYPE, PingData, WEBHOOK_EVENTS, WEBHOOK_EVENT_TYPES } from "../webhooks/catalog";
+import { MAX_ATTEMPTS, RETRY_DELAYS_MS } from "../webhooks/retry";
+import { TIMESTAMP_TOLERANCE_SECONDS } from "../webhooks/signature";
 
 type Json = Record<string, unknown>;
 
@@ -113,7 +116,35 @@ Each token may make ${"`API_TOKEN_RATE_LIMIT`"} requests a minute (600 by defaul
 - JSON in and out, except CSV exports, the Markdown report, and image uploads (raw bytes).
 - Ids are UUIDs. Times are ISO 8601 in UTC.
 - Errors always look like \`{"error": {"code", "message", "details?"}}\`. \`code\` is stable; branch on it, not on the message.
-- Every response has an \`X-Request-Id\` header; the same id is stored with audit-log entries.`;
+- Every response has an \`X-Request-Id\` header; the same id is stored with audit-log entries.
+
+## Webhooks
+Organizers add endpoints under *Manage → Webhooks* (or \`POST /api/events/{slug}/webhooks\`). Each change is queued in the same database transaction as the change itself, then POSTed as JSON. The payload types are listed under **Webhooks** in this document.
+- **Verify every request.** Signatures follow [Standard Webhooks](https://www.standardwebhooks.com): \`webhook-signature\` is \`v1,\` + base64 HMAC-SHA256 of \`{webhook-id}.{webhook-timestamp}.{body}\`, keyed with the base64 part of your \`whsec_…\` secret. Reject timestamps more than ${TIMESTAMP_TOLERANCE_SECONDS / 60} minutes old. During a secret rotation the header carries two signatures; accept either.
+- **Answer 2xx quickly.** Anything else, a timeout (10 s) or a redirect counts as a failure. Failed deliveries are retried up to ${MAX_ATTEMPTS} times over about ${Math.round(RETRY_DELAYS_MS.reduce((a, b) => a + b, 0) / 3_600_000)} hours, with backoff. Answer 410 to unsubscribe.
+- **De-duplicate on \`id\`.** Delivery is at-least-once, and a redelivery reuses the id. Order is not guaranteed; use \`timestamp\`.
+- **Payloads are thin.** Ids, a few public fields and API links, never scores, emails or comment text. Fetch details with an API token. Ballot activity is never sent, because vote counts stay sealed until voting closes.`;
+
+function webhookDocs(): Record<string, Json> {
+  const entries: Array<[string, string, z.ZodType]> = [
+    ...WEBHOOK_EVENT_TYPES.map((t): [string, string, z.ZodType] => [t, WEBHOOK_EVENTS[t].description, WEBHOOK_EVENTS[t].data]),
+    [PING_TYPE, "A test delivery, sent from the webhook's page. Always delivered, whatever the subscription.", PingData],
+  ];
+  return Object.fromEntries(
+    entries.map(([type, description, data]) => [
+      type,
+      {
+        post: {
+          operationId: `webhook_${type.replace(/\W/g, "_")}`,
+          summary: description,
+          parameters: ["webhook-id", "webhook-timestamp", "webhook-signature"].map((name) => ({ name, in: "header", required: true, schema: { type: "string" } })),
+          requestBody: { required: true, content: { "application/json": { schema: jsonSchema(Envelope.extend({ type: z.literal(type), data }), "output") } } },
+          responses: { "2XX": { description: "Received. Any other answer is retried." }, "410": { description: "Unsubscribe: the endpoint is switched off." } },
+        },
+      },
+    ]),
+  );
+}
 
 export function buildSpec(serverUrl: string): Json {
   const paths: Record<string, Json> = {};
@@ -131,6 +162,7 @@ export function buildSpec(serverUrl: string): Json {
       license: { name: "MIT", identifier: "MIT" },
     },
     servers: [{ url: serverUrl }],
+    webhooks: webhookDocs(),
     tags: TAGS.map((t) => ({ ...t })),
     paths,
     components: {
