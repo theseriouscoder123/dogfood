@@ -5,7 +5,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["tests/integration/**/*.test.ts"],
-    env: { SMTP_URL: "", UPLOAD_DIR: "./.test-uploads", WEBHOOK_ALLOW_PRIVATE_HOSTS: "127.0.0.1" },
+    env: { SMTP_URL: "", UPLOAD_DIR: "./.test-uploads", WEBHOOK_ALLOW_PRIVATE_HOSTS: "127.0.0.1", SIGNING_KEY_PATH: "./.test-keys/signing-key.pem" },
     globalSetup: ["tests/integration/globalSetup.ts"],
     setupFiles: ["tests/integration/setupEnv.ts"],
     fileParallelism: false,

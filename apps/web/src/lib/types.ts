@@ -598,3 +598,53 @@ export type WebhookDeliveryDetail = {
   delivery: WebhookDelivery & { payload: unknown };
   attempts: Array<{ attemptedAt: string; durationMs: number; statusCode: number | null; error: string | null; responseBody: string | null }>;
 };
+
+// ── signed records (T4) ──
+export type RecordType = "judge_participation" | "participation";
+export type RecordStatement = {
+  id: string;
+  type: RecordType;
+  version: number;
+  issuer: { name: string; url: string };
+  kid: string;
+  issuedAt: string;
+  event: { slug: string; name: string; startedAt: string; endedAt: string };
+  subject: { name: string; role: "judge" | "participant" };
+  claims: {
+    reviewsSubmitted?: number;
+    projectsReviewed?: number;
+    tracks?: string[];
+    reviewsDigest?: string;
+    team?: string;
+    project?: { id: string; title: string; track: string | null; url: string };
+    placement?: { rank: number; of: number; runId: string; method: string } | null;
+    peoplesChoice?: { rank: number; votes: number } | null;
+  };
+  verify: string;
+};
+export type PublicRecord = {
+  status: "current" | "superseded" | "revoked" | "invalid";
+  signatureValid: boolean;
+  statement: RecordStatement;
+  signedText: string;
+  signature: string;
+  key: { kid: string; alg: "Ed25519"; publicKeyPem: string; retiredAt: string | null };
+  revokedAt: string | null;
+  revokedReason: string | null;
+  supersededById: string | null;
+  event: { slug: string; logoUrl: string | null; bannerUrl: string | null };
+};
+export type RecordSummary = {
+  id: string;
+  type: RecordType;
+  status: "current" | "superseded" | "revoked";
+  subject: { name: string; email?: string };
+  claims: RecordStatement["claims"];
+  kid: string;
+  issuedAt: string;
+  revokedAt: string | null;
+  revokedReason: string | null;
+  supersededById: string | null;
+  event?: { slug: string; name: string; logoUrl: string | null };
+};
+export type RecordsAdmin = { issuable: boolean; judgingClosesAt: string | null; resultsPublished: boolean; peoplesChoicePublished: boolean; records: RecordSummary[] };

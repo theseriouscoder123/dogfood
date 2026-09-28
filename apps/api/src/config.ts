@@ -28,4 +28,6 @@ export const config = {
     .filter(Boolean),
   /** Run the webhook delivery worker inside the API process. */
   webhookWorker: bool("WEBHOOK_WORKER", true),
+  /** Ed25519 private key (PEM) that signs records and certificates. Created on first use; keep it on its own volume and back it up. */
+  signingKeyPath: process.env.SIGNING_KEY_PATH ?? path.resolve(process.cwd(), "keys/signing-key.pem"),
 };

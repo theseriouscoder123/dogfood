@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, CalendarClock, Download, Webhook, Heart, Medal, MessageSquare, ShieldAlert, ShieldCheck, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
+import { Activity, Award, CalendarClock, Download, Webhook, Heart, Medal, MessageSquare, ShieldAlert, ShieldCheck, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
 
 const GROUPS = [
   {
@@ -26,6 +26,7 @@ const GROUPS = [
       { path: "/progress", label: "Progress", icon: Activity },
       { path: "/integrity", label: "Integrity", icon: ShieldCheck },
       { path: "/results", label: "Results", icon: Medal },
+      { path: "/certificates", label: "Certificates", icon: Award },
     ],
   },
   {

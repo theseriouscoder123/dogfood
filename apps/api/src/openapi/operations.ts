@@ -18,6 +18,7 @@ import { ResolveBody } from "../routes/integrity";
 import { BallotBody, CreateInvitesBody, QuarantineBody, ReceiptBody, RedeemBody, ResolveIncidentBody, RestoreBody, RevokeInvitesBody, SettingsBody } from "../routes/voting";
 import { EXPORT_FILES } from "../routes/exports";
 import { CreateWebhookBody, DeliveriesQuery, UpdateWebhookBody } from "../routes/webhooks";
+import { RevokeRecordBody } from "../routes/records";
 
 export type Method = "get" | "post" | "put" | "patch" | "delete";
 
@@ -54,6 +55,7 @@ export const TAGS = [
   { name: "People's Choice", description: "Published vote results, the anonymous ballot file and receipt checks." },
   { name: "Moderation", description: "Comment moderation for organizers." },
   { name: "Exports", description: "CSV exports for every stage. Each download is audit-logged." },
+  { name: "Records", description: "Ed25519-signed judge participation records and participant certificates, verifiable by anyone." },
   { name: "Webhooks", description: "Signed HTTP callbacks to your systems when things happen in an event. See the Webhooks section below for payloads and verification." },
 ] as const;
 export type Tag = (typeof TAGS)[number]["name"];
@@ -101,6 +103,7 @@ export const PARAMS: Record<string, string> = {
   file: `One of: ${EXPORT_FILES.join(", ")}.`,
   webhookId: "Webhook id (UUID).",
   deliveryId: "Delivery id (UUID).",
+  recordId: "Record id (UUID); also the public verification id.",
 };
 
 const E = "/api/events/:slug";
@@ -268,5 +271,13 @@ export const OPERATIONS: Operation[] = [
   { method: "post", path: `${E}/webhooks/:webhookId/rotate-secret`, tag: "Webhooks", summary: "Rotate the signing secret (the old one keeps signing for 24 hours)", access: "organizer" },
   { method: "post", path: `${E}/webhooks/:webhookId/ping`, tag: "Webhooks", summary: "Send a test delivery (type webhook.ping)", access: "organizer", status: 201 },
   { method: "get", path: `${E}/webhooks/:webhookId/deliveries/:deliveryId`, tag: "Webhooks", summary: "One delivery: the exact payload and every attempt with its response", access: "organizer" },
+  // ── records ──
+  { method: "get", path: `${E}/records`, tag: "Records", summary: "Issued records and certificates, and whether issuing is possible yet", access: "organizer" },
+  { method: "post", path: `${E}/records/issue`, tag: "Records", summary: "Issue (or re-issue) signed records for every judge and participant", description: "Only after judging closes. Re-running re-signs only people whose facts changed; their previous record is marked superseded.", access: "organizer", status: 201 },
+  { method: "post", path: `${E}/records/:recordId/revoke`, tag: "Records", summary: "Revoke a record, with a reason (permanent)", access: "organizer", body: RevokeRecordBody },
+  { method: "get", path: "/api/records/keys", tag: "Records", summary: "Public keys that sign records, current and retired", access: "public" },
+  { method: "get", path: "/api/records/mine", tag: "Records", summary: "Your own current records, across events", access: "signed_in" },
+  { method: "get", path: "/api/records/:recordId", tag: "Records", summary: "Verify a record: its status, statement, the exact signed text and signature", description: "`signedText` is the exact UTF-8 text that was signed, so you can check the signature yourself rather than trust `signatureValid`.", access: "public" },
+  { method: "get", path: "/api/records/:recordId/signed.json", tag: "Records", summary: "Download the portable signed record, for offline verification", access: "public" },
   { method: "post", path: `${E}/webhooks/:webhookId/deliveries/:deliveryId/redeliver`, tag: "Webhooks", summary: "Send a finished delivery again (same message id)", access: "organizer", status: 201 },
 ];

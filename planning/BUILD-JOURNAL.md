@@ -146,3 +146,22 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - Each endpoint has a live delivery log with every attempt (status, time, response excerpt), the exact payload, and redeliver (same message id).
   - The API reference renders every event's payload fields and a 10-line Node verification snippet.
 - **Mon** Demo: a `hooks` compose service (the API image running `webhook-receiver.js`) verifies signatures and lists what arrived at http://localhost:9000. The seed adds a healthy endpoint and one that's down on purpose, so the log shows success, 503s and scheduled retries straight after `docker compose up`.
+- **Mon · T4 phase 3 (signed records and certificates)** The Ed25519 private key is a PEM file on its own volume (`SIGNING_KEY_PATH`, mode 0600, created on first start), never in the database, so a stolen database dump can't forge a certificate. The public half is registered in `SigningKey` under a kid (sha256 of the SPKI, first 16 hex characters). Replacing the file rotates the key: the next start registers the new key and marks the old one retired, and records it signed stay verifiable. There's a test for this.
+- **Mon** What gets signed: a versioned statement (issuer, kid, event, subject name, claims, verify URL) as canonical JSON.
+  - **Judges** who submitted a review get a participation record: review count, projects, tracks, and a `reviewsDigest`, a SHA-256 over their exact reviews and scores. It commits to the work without revealing a score. If a judge's work is ever disputed, the organizer can show the reviews and anyone can check them against the digest.
+  - **Team members** of submitted projects get a certificate with the project and, once results are public, their placement and People's Choice rank.
+  - **Never included:** emails and scores.
+- **Mon** Records never change.
+  - A trigger blocks any edit to what was signed, blocks un-revoking, and blocks direct deletes (cascades from deleting an account are allowed). A test tries each one with raw SQL.
+  - Re-issuing re-signs only people whose facts changed (for example after results are published) and supersedes the old record. The "one current record per person" index is partial, so the supersede foreign key is deferred to commit.
+  - Revocation is permanent, needs a reason, and is audited. A revoked person isn't quietly re-issued.
+  - Issuing is locked per event and only allowed once judging has closed.
+- **Mon** Three independent ways to verify:
+  - `/verify/:id` re-checks the signature in the visitor's browser with WebCrypto Ed25519 over the exact `signedText` the API returns, and shows the claims parsed from that same text. What you see is what was verified.
+  - `tools/verify-record.mjs` is plain Node with no packages; `--key` pins the issuer's key.
+  - `--openssl` writes the files for `openssl pkeyutl -verify -rawin`. Checked by hand: "Signature Verified Successfully".
+  - An integration test runs the tool on a downloaded record, then forges a placement in it; the tool exits with 1.
+- **Mon** Certificates: an A4-landscape page with container-query sizing, so it scales from phone to paper. Fixed colours make it print the same in dark mode. A QR code (the `qrcode` package, rendered to SVG on the server) links to the verify page. A revoked or superseded certificate prints a watermark. "Print or save as PDF" uses the browser, so there's no PDF library.
+  - Pages: *My certificates* for each person, and *Manage → Certificates* (issue, re-issue changed, revoke with a reason).
+  - A `records.issued` webhook fires on issuing.
+  - The seed signs 121 records for the sample event (30 judges, 91 participants).

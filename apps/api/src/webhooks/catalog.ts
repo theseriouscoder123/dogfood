@@ -118,6 +118,12 @@ export const WEBHOOK_EVENTS = {
     build: async (c) => ({ ballots: after(c.a).ballots, ballotsSha256: after(c.a).ballotsHash, url: api(`/events/${c.slug}/voting/results`) }),
   },
   "peoples_choice.unpublished": { description: "People's Choice results were taken down.", actions: ["voting.results_unpublished"], data: z.object({}), build: async () => ({}) },
+  "records.issued": {
+    description: "Signed participation records and certificates were issued (or re-issued with updated facts).",
+    actions: ["records.issued"],
+    data: z.object({ issued: z.number().int(), superseded: z.number().int(), unchanged: z.number().int() }),
+    build: async (c) => ({ issued: after(c.a).issued, superseded: after(c.a).superseded, unchanged: after(c.a).unchanged }),
+  },
   "event.updated": {
     description: "The event's details or dates changed.",
     actions: ["event.update"],

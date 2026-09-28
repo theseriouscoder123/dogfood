@@ -545,7 +545,7 @@ votingRouter.post("/voting/review/resolve", async (req, res) => {
 // under anyone's feet. Unpublish first to revise, which is itself audited.
 
 
-async function votingData(eventId: string) {
+export async function votingData(eventId: string) {
   const [ballots, projects] = await Promise.all([
     prisma.ballot.findMany({ where: { eventId }, select: { receipt: true, status: true, choices: { select: { projectId: true, position: true } } } }),
     prisma.project.findMany({

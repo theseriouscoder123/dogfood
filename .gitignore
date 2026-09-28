@@ -9,3 +9,5 @@ coverage/
 *.tsbuildinfo
 apps/api/uploads/
 apps/api/.test-uploads/
+apps/api/keys/
+apps/api/.test-keys/

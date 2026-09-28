@@ -2314,6 +2314,112 @@
         }
       }
     },
+    "records.issued": {
+      "post": {
+        "operationId": "webhook_records_issued",
+        "summary": "Signed participation records and certificates were issued (or re-issued with updated facts).",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique per event occurrence, e.g. \"evt_1042\". The same on retries and redeliveries: de-duplicate on it."
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "records.issued"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the change happened."
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "issued": {
+                        "type": "integer"
+                      },
+                      "superseded": {
+                        "type": "integer"
+                      },
+                      "unchanged": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "issued",
+                      "superseded",
+                      "unchanged"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "timestamp",
+                  "event",
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "410": {
+            "description": "Unsubscribe: the endpoint is switched off."
+          },
+          "2XX": {
+            "description": "Received. Any other answer is retried."
+          }
+        }
+      }
+    },
     "event.updated": {
       "post": {
         "operationId": "webhook_event_updated",
@@ -2595,6 +2701,10 @@
     {
       "name": "Exports",
       "description": "CSV exports for every stage. Each download is audit-logged."
+    },
+    {
+      "name": "Records",
+      "description": "Ed25519-signed judge participation records and participant certificates, verifiable by anyone."
     },
     {
       "name": "Webhooks",
@@ -16972,7 +17082,7 @@
                   },
                   "eventTypes": {
                     "description": "The event types to send. Empty means every type, including ones added later.",
-                    "maxItems": 19,
+                    "maxItems": 20,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -16995,6 +17105,7 @@
                         "results.unpublished",
                         "peoples_choice.published",
                         "peoples_choice.unpublished",
+                        "records.issued",
                         "event.updated"
                       ]
                     }
@@ -17258,7 +17369,7 @@
                   },
                   "eventTypes": {
                     "description": "The event types to send. Empty means every type, including ones added later.",
-                    "maxItems": 19,
+                    "maxItems": 20,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -17281,6 +17392,7 @@
                         "results.unpublished",
                         "peoples_choice.published",
                         "peoples_choice.unpublished",
+                        "records.issued",
                         "event.updated"
                       ]
                     }
@@ -17725,6 +17837,620 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/records": {
+      "get": {
+        "operationId": "getEventsBySlugRecords",
+        "tags": [
+          "Records"
+        ],
+        "summary": "Issued records and certificates, and whether issuing is possible yet",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/records/issue": {
+      "post": {
+        "operationId": "postEventsBySlugRecordsIssue",
+        "tags": [
+          "Records"
+        ],
+        "summary": "Issue (or re-issue) signed records for every judge and participant",
+        "description": "Only after judging closes. Re-running re-signs only people whose facts changed; their previous record is marked superseded.\n\n**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{slug}/records/{recordId}/revoke": {
+      "post": {
+        "operationId": "postEventsBySlugRecordsByRecordIdRevoke",
+        "tags": [
+          "Records"
+        ],
+        "summary": "Revoke a record, with a reason (permanent)",
+        "description": "**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "description": "Record id (UUID); also the public verification id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation; `details` lists the issues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/records/keys": {
+      "get": {
+        "operationId": "getRecordsKeys",
+        "tags": [
+          "Records"
+        ],
+        "summary": "Public keys that sign records, current and retired",
+        "description": "**Who can call this:** Anyone. No sign-in needed (signing in may show more, e.g. your own drafts).",
+        "x-access": "public",
+        "security": [
+          {},
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/records/mine": {
+      "get": {
+        "operationId": "getRecordsMine",
+        "tags": [
+          "Records"
+        ],
+        "summary": "Your own current records, across events",
+        "description": "**Who can call this:** Any signed-in user.",
+        "x-access": "signed_in",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/records/{recordId}": {
+      "get": {
+        "operationId": "getRecordsByRecordId",
+        "tags": [
+          "Records"
+        ],
+        "summary": "Verify a record: its status, statement, the exact signed text and signature",
+        "description": "`signedText` is the exact UTF-8 text that was signed, so you can check the signature yourself rather than trust `signatureValid`.\n\n**Who can call this:** Anyone. No sign-in needed (signing in may show more, e.g. your own drafts).",
+        "x-access": "public",
+        "security": [
+          {},
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "description": "Record id (UUID); also the public verification id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/records/{recordId}/signed.json": {
+      "get": {
+        "operationId": "getRecordsByRecordIdSignedJson",
+        "tags": [
+          "Records"
+        ],
+        "summary": "Download the portable signed record, for offline verification",
+        "description": "**Who can call this:** Anyone. No sign-in needed (signing in may show more, e.g. your own drafts).",
+        "x-access": "public",
+        "security": [
+          {},
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "description": "Record id (UUID); also the public verification id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
                 }
               }
             }

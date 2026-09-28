@@ -18,7 +18,7 @@ COPY --from=build /app/prisma ./prisma
 COPY data/fixtures.json ./data/fixtures.json
 COPY apps/api/docker-entrypoint.sh ./
 # Uploaded images live on a named volume; create it owned by the runtime user.
-RUN mkdir -p /data/uploads && chown node:node /data/uploads
+RUN mkdir -p /data/uploads /data/keys && chown node:node /data/uploads /data/keys && chmod 700 /data/keys
 USER node
 EXPOSE 4000
 CMD ["sh", "docker-entrypoint.sh"]

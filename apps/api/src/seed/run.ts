@@ -10,6 +10,7 @@ import { importFixtures } from "./importFixtures";
 import { seedShowcase } from "./showcase";
 import { DEMO_JUDGE_EMAIL, DEMO_VOTER_EMAIL, JUDGING_DEMO_SLUG, seedJudgingDemo } from "./judgingDemo";
 import { enqueuePing } from "../webhooks/outbox";
+import { issuable, issueRecords } from "../records/issue";
 
 const DEMO_PASSWORD = "dogfood2026";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "admin@dogfood.local").toLowerCase();
@@ -77,6 +78,12 @@ async function main() {
   if (process.env.SEED_SHOWCASE !== "false") {
     await seedShowcase(prisma, event.id, organizer.id);
     await seedJudgingDemo(prisma, organizer.id, demoHash);
+    // The sample event's judging is over and its results are public: sign its records and certificates.
+    const sample = await prisma.event.findUniqueOrThrow({ where: { id: event.id } });
+    if (issuable(sample) && (await prisma.signedRecord.count({ where: { eventId: sample.id } })) === 0) {
+      const r = await issueRecords(sample, { actorLabel: "system:seed" });
+      console.log(`signed ${r.issued} records and certificates for "${sample.slug}"`);
+    }
   }
 
   if (created && summary) {

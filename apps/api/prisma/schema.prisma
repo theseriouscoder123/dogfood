@@ -113,6 +113,8 @@ model User {
   passwordResets PasswordReset[]
   apiTokens      ApiToken[]
   webhooks       Webhook[]
+  records        SignedRecord[] @relation("RecordSubject")
+  recordsIssued  SignedRecord[] @relation("RecordIssuer")
 }
 
 model Session {
@@ -183,6 +185,7 @@ model Event {
   ballots      Ballot[]
   comments     Comment[]
   webhooks     Webhook[]
+  records      SignedRecord[]
 }
 
 model EventRole {
@@ -853,4 +856,51 @@ model WebhookAttempt {
   delivery WebhookDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
 
   @@index([deliveryId])
+}
+
+// ── signed records (T4) ───────────────────────────────────────────────────────
+// Public half of each Ed25519 key that has ever signed a record. The private key lives in a file
+// on its own volume (SIGNING_KEY_PATH), never in the database, so a database dump can't forge
+// records. Retired keys stay listed so records they signed remain verifiable.
+model SigningKey {
+  kid          String    @id // first 16 hex chars of sha256(SPKI DER)
+  algorithm    String    @default("Ed25519")
+  publicKeyPem String
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  retiredAt    DateTime? @db.Timestamptz(3)
+
+  records SignedRecord[]
+}
+
+enum RecordType {
+  judge_participation
+  participation
+}
+
+// A signed statement about one person's part in an event: a judge's participation, or a
+// participant's certificate. The statement and signature never change (DB trigger); a record can
+// only be revoked, or superseded by a newer one when the facts change (e.g. results published).
+model SignedRecord {
+  id             String     @id @default(uuid()) @db.Uuid // also the public verification id
+  eventId        String     @db.Uuid
+  userId         String     @db.Uuid
+  type           RecordType
+  statement      Json // exactly what was signed (canonical JSON of this)
+  signature      String // base64url Ed25519 signature over the canonical statement
+  kid            String
+  issuedAt       DateTime   @default(now()) @db.Timestamptz(3)
+  issuedById     String?    @db.Uuid
+  revokedAt      DateTime?  @db.Timestamptz(3)
+  revokedReason  String?
+  supersededById String?    @db.Uuid
+
+  event        Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user         User           @relation("RecordSubject", fields: [userId], references: [id], onDelete: Cascade)
+  issuedBy     User?          @relation("RecordIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+  key          SigningKey     @relation(fields: [kid], references: [kid])
+  supersededBy SignedRecord?  @relation("Supersedes", fields: [supersededById], references: [id])
+  supersedes   SignedRecord[] @relation("Supersedes")
+
+  @@index([eventId])
+  @@index([userId])
 }

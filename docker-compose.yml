@@ -37,10 +37,13 @@ services:
       SMTP_URL: smtp://mail:1025
       PUBLIC_BASE_URL: http://localhost:8080
       UPLOAD_DIR: /data/uploads
+      # Ed25519 key that signs records and certificates. Its own volume: back it up, never share it.
+      SIGNING_KEY_PATH: /data/keys/signing-key.pem
       # Webhooks may not reach private addresses (SSRF guard), except the demo receiver below.
       WEBHOOK_ALLOW_PRIVATE_HOSTS: hooks
     volumes:
       - uploads:/data/uploads
+      - keys:/data/keys
     depends_on:
       db:
         condition: service_healthy
@@ -86,3 +89,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  keys:
