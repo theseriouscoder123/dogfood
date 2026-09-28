@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { getMe } from "@/lib/session";
 import { phaseOf, relativeLeft } from "@/lib/phase";
 import { formatDate } from "@/lib/format";
+import type { EventSummary } from "@/lib/types";
 import { buttonClass, Pill } from "@/components/ui";
 import { LogoTile } from "@/components/visuals";
 
@@ -28,7 +29,7 @@ const greeting = () => {
 export default async function DashboardPage() {
   const me = await getMe();
   if (!me.user) redirect("/login?next=/dashboard");
-  const { events } = await api<{ events: DashEvent[] }>("/api/me/dashboard");
+  const [{ events }, all] = await Promise.all([api<{ events: DashEvent[] }>("/api/me/dashboard"), api<{ events: EventSummary[] }>("/api/events")]);
   const now = Date.now();
 
   const deadlines = events
@@ -50,6 +51,8 @@ export default async function DashboardPage() {
   const organizing = events.filter((e) => e.organizer);
   const judging = events.filter((e) => e.judge);
   const building = events.filter((e) => e.participant);
+  const mine = new Set(events.map((e) => e.slug));
+  const joinable = all.events.filter((e) => !mine.has(e.slug) && ["registration", "submissions"].includes(phaseOf(e).phase)).slice(0, 3);
 
   return (
     <div className="mx-auto max-w-7xl space-y-10 px-4 pt-10 sm:px-6">
@@ -185,6 +188,17 @@ export default async function DashboardPage() {
             </Section>
           )}
         </>
+      )}
+
+      {joinable.length > 0 && (
+        <Section icon={<Compass className="size-4" />} title="Open to join">
+          {joinable.map((e) => (
+            <EventTile key={e.slug} e={{ ...e, roles: [], participant: null, judge: null, organizer: null, votingOpensAt: null, votingClosesAt: null }} href={`/events/${e.slug}`} action="View hackathon">
+              {e.tagline && <p className="line-clamp-2 text-sm text-muted">{e.tagline}</p>}
+              <p className="mt-2 text-xs text-muted">{relativeLeft(e.submissionsCloseAt)} to submit</p>
+            </EventTile>
+          ))}
+        </Section>
       )}
     </div>
   );

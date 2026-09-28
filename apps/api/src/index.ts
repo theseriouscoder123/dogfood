@@ -4,15 +4,18 @@ import { prisma } from "./db";
 import { startWebhookWorker } from "./webhooks/worker";
 import { getSigner } from "./records/keys";
 import { runReminders, sendNotificationEmails } from "./notifications/notify";
+import { watchJudges, watchVoting } from "./notifications/watch";
 
 const server = createApp().listen(config.port, () => {
   console.log(`api listening on :${config.port}`);
 });
 const stopWorker = config.webhookWorker ? startWebhookWorker() : () => {};
-// Deadline reminders once a minute; notification emails every few seconds.
+// Deadline reminders and organizer alerts once a minute; notification emails every few seconds.
 const jobs = config.webhookWorker
   ? [
       setInterval(() => void runReminders().catch((err: unknown) => console.error("[reminders]", err)), 60_000),
+      setInterval(() => void watchJudges().catch((err: unknown) => console.error("[judge alerts]", err)), 60_000),
+      setInterval(() => void watchVoting().catch((err: unknown) => console.error("[vote alerts]", err)), 60_000),
       setInterval(() => void sendNotificationEmails().catch((err: unknown) => console.error("[notification email]", err)), 5_000),
     ]
   : [];

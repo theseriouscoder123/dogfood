@@ -14,7 +14,7 @@ export default async function EventOverviewPage({ params }: { params: Promise<{ 
   const about = event.overview.trim() || event.description.trim();
 
   return (
-    <HubColumns slug={slug}>
+    <HubColumns slug={slug} sidebarFirst>
       <Card title="About this hackathon">
         {about ? <Markdown>{about}</Markdown> : <p className="text-sm text-muted">The organizers haven&apos;t written an overview yet.</p>}
       </Card>

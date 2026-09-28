@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { api, makeEvent, makeTeamWithProject, makeUser, prisma } from "./helpers";
 import { makeReceipt, normalizeEmail } from "../../src/voting/core";
 import { verifyAuditChain } from "../../src/audit";
+import { watchVoting } from "../../src/notifications/watch";
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -123,6 +124,15 @@ describe("the review queue", () => {
       );
     return { ...s, organic, ring };
   }
+
+  it("alerts organizers once about an open high-severity incident", async () => {
+    const s = await scenario();
+    await watchVoting();
+    await watchVoting();
+    const alerts = await prisma.notification.findMany({ where: { userId: s.organizer.id, category: "organizer" } });
+    expect(alerts.map((n) => n.title)).toEqual(["Suspicious voting needs a look"]);
+    expect(alerts[0]!.url).toBe(`/events/${s.event.slug}/manage/vote-review`);
+  }, 60_000);
 
   it("finds the ring as one high-severity incident naming the project it backs", async () => {
     const s = await scenario();

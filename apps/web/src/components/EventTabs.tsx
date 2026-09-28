@@ -1,12 +1,18 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export function EventTabs({ tabs }: { tabs: Array<{ href: string; label: string; count?: number; exact?: boolean }> }) {
   const path = usePathname();
+  const nav = useRef<HTMLElement>(null);
+  // Keep the active tab in view when the row scrolls sideways on phones.
+  useEffect(() => {
+    nav.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [path]);
   return (
-    <nav className="-mb-px flex gap-1 overflow-x-auto" aria-label="Event sections">
+    <nav ref={nav} className="-mb-px flex gap-1 overflow-x-auto" aria-label="Event sections">
       {tabs.map((t) => {
         const active = t.exact ? path === t.href : path === t.href || path.startsWith(t.href + "/");
         return (

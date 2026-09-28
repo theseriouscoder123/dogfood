@@ -11,7 +11,7 @@ export default async function ProgressPage({ params }: { params: Promise<{ slug:
     <div className="space-y-6">
       <div>
         <h1 className="mb-1 text-3xl font-extrabold">Judging progress</h1>
-        <p className="text-sm text-muted">Who has finished, who is behind, and which projects are waiting. Only organizers see this page.</p>
+        <p className="text-sm text-muted">Who has finished, who is behind, and which projects are waiting.</p>
       </div>
       <ProgressBoard slug={slug} initial={data} />
     </div>

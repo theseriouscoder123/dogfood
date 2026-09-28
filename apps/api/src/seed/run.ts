@@ -122,7 +122,6 @@ async function seedDemoNotifications(sampleEventId: string) {
   const notes: Note[] = [
     { userId: judge.id, eventId: sprint.id, category: "judging", title: "6 projects to review", body: sprint.name, url: `/events/${sprint.slug}/judging`, key: "demo:judge:assigned" },
     { userId: judge.id, eventId: sprint.id, category: "reminders", title: `Judging for ${sprint.name} closes soon`, body: "3 reviews left.", url: `/events/${sprint.slug}/judging`, key: "demo:judge:reminder" },
-    { userId: org.id, eventId: sprint.id, category: "organizer", title: "Suspicious voting in Spring Build Sprint", body: "12 ballots for one project from a single network. Review them before publishing.", url: `/events/${sprint.slug}/manage/vote-review`, key: "demo:org:votes" },
     { userId: org.id, eventId: sprint.id, category: "organizer", title: "A webhook keeps failing", body: "CRM sync: 503 Service Unavailable. Retrying with backoff.", url: `/events/${sprint.slug}/manage/webhooks`, key: "demo:org:webhook" },
     { userId: priya.id, eventId: sample.id, category: "results", title: `Results are out for ${sample.name}`, url: `/events/${sample.slug}/results`, key: "demo:priya:results" },
     ...(cert ? [{ userId: priya.id, eventId: sample.id, category: "results" as const, title: `Your certificate for ${sample.name} is ready`, url: `/certificates/${cert.id}`, key: "demo:priya:cert" }] : []),

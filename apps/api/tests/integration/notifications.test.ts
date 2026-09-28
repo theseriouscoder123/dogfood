@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { api, makeEvent, makeJudge, makeReview, makeTeamWithProject, makeUser, prisma } from "./helpers";
 import { appendAudit } from "../../src/audit";
 import { runReminders } from "../../src/notifications/notify";
+import { watchJudges } from "../../src/notifications/watch";
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -91,6 +92,30 @@ describe("deadline reminders", () => {
     await runReminders(new Date());
     expect((await inbox(busy.id)).map((n) => n.body)).toEqual(["1 review left."]);
     expect(await inbox(finished.id)).toHaveLength(0);
+  });
+});
+
+describe("organizer alerts", () => {
+  it("tell organizers once when a judge falls behind, and tell a judge when they're nudged", async () => {
+    const ctx = await makeEvent({ open: false });
+    const a = await makeTeamWithProject(ctx.event.id, ctx.trackA.id);
+    const b = await makeTeamWithProject(ctx.event.id, ctx.trackB.id);
+    const idle = await makeJudge(ctx.event.id);
+    const done = await makeJudge(ctx.event.id);
+    await makeReview(ctx.event.id, idle.id, a.project.id);
+    await makeReview(ctx.event.id, idle.id, b.project.id);
+    await makeReview(ctx.event.id, done.id, a.project.id, {});
+    // Most of the judging window is gone.
+    await prisma.event.update({ where: { id: ctx.event.id }, data: { judgingOpensAt: new Date(Date.now() - 100 * 3_600_000), judgingClosesAt: new Date(Date.now() + 20 * 3_600_000) } });
+    await watchJudges();
+    await watchJudges();
+    const alerts = (await inbox(ctx.organizer.id)).filter((n) => n.category === "organizer");
+    expect(alerts.map((n) => n.title)).toEqual([`${idle.name} hasn't started judging`]);
+    expect(alerts[0]!.body).toBe("2 reviews left · Test Event");
+
+    expect((await api().post(`${ctx.base}/progress/remind`).set("Cookie", ctx.organizer.cookie).send({ judgeIds: [idle.id] })).status).toBe(200);
+    const nudge = (await inbox(idle.id)).find((n) => n.title.startsWith("Reminder"));
+    expect(nudge).toMatchObject({ title: "Reminder: 2 reviews left for Test Event", emailWanted: false });
   });
 });
 

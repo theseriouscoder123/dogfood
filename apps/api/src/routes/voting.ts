@@ -387,7 +387,7 @@ export const maskEmail = (email: string) => {
   return local.length <= 2 ? `${local[0] ?? ""}*@${domain}` : `${local[0]}***${local.at(-1)}@${domain}`;
 };
 
-async function loadAbuseBallots(eventId: string) {
+export async function loadAbuseBallots(eventId: string) {
   const [ballots, views] = await Promise.all([
     prisma.ballot.findMany({
       where: { eventId },

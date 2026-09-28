@@ -213,3 +213,14 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - A **team finder**: people looking and teams with room. Posts drop off automatically once someone joins a team or a team fills. "Invite to team" sends a single-use join link as a notification. Posting counts as registering.
 - **Mon** **Copy pass.** About 45 over-explaining helper texts cut to short product lines (including an integrity note that literally said "not AI"). The sparkle badge and eyebrow labels are gone.
 - **Mon** Demo seed: filled-in profiles for the demo accounts, notifications in their bells, announcements on the live events, and a team finder with four people looking and one team with room.
+
+## Polish: finishing D and F (Sep 28)
+
+- **Organizer alerts.** `notifications/watch.ts` runs once a minute in the worker. `watchJudges` uses the same straggler rule as the progress dashboard (`assessJudge`): a judge who is behind pace, or hasn't started after 20% of the window, raises one alert per organizer. `watchVoting` alerts on high-severity vote incidents that have no organizer decision. Unique keys (`behind:…`, `incident:…`) mean each alert goes out once. Pressing "Remind" on the progress page now also puts a notice in the judge's bell (`judge.reminded`). It has `noEmail`, because that route already sends the email.
+- **Seed.** Dropped the canned "suspicious voting" demo alert, since the real watcher now produces it from the planted ring.
+- **Loading states.** `components/Skeleton.tsx` plus `loading.tsx` files for the root, the event hub, the organizer console and account pages.
+- **Sweep (light, dark, 390px).**
+  - Dashboard: new "Open to join" section, so a participant whose events have all ended still sees what's live.
+  - Event hub on phones: the status card now sits under the content except on Overview, and the active tab scrolls into view.
+  - Trimmed the progress page subtitle.
+- **Checks.** Tests: 400 unit, 178 integration. Checker: T1 T2 verified.

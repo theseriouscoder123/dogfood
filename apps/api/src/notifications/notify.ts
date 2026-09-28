@@ -25,7 +25,7 @@ export type Category = keyof typeof CATEGORIES;
 /** Categories that also go out by email (to people with email notifications on). */
 const EMAILED: ReadonlySet<Category> = new Set(["announcements", "results", "reminders", "organizer", "judging"]);
 
-export type Note = { userId: string; eventId?: string | null; category: Category; title: string; body?: string; url: string; key?: string };
+export type Note = { userId: string; eventId?: string | null; category: Category; title: string; body?: string; url: string; key?: string; noEmail?: boolean };
 
 /** Write notifications, skipping anyone who muted the category (and never notifying people about their own actions). */
 export async function notify(db: Tx | typeof prisma, notes: Note[], actorId?: string | null): Promise<number> {
@@ -43,7 +43,7 @@ export async function notify(db: Tx | typeof prisma, notes: Note[], actorId?: st
       body: n.body ?? "",
       url: n.url,
       key: n.key ?? null,
-      emailWanted: EMAILED.has(n.category) && pref.get(n.userId)!.emailNotifications,
+      emailWanted: !n.noEmail && EMAILED.has(n.category) && pref.get(n.userId)!.emailNotifications,
     }));
   const r = await db.notification.createMany({ data: rows, skipDuplicates: true });
   return r.count;
@@ -91,6 +91,10 @@ const HANDLERS: Record<string, Handler> = {
     return (await teamMembers(tx, p.teamId)).map((m) => ({ userId: m.userId, category: "submissions", title: `“${p.title}” is submitted`, body: `You can keep editing until submissions close.`, url: `/events/${e.slug}/projects/${f.entityId}` }));
   },
   "judge.invite": async (_tx, f, e) => (f.entityId ? [{ userId: f.entityId, category: "judging", title: `You're on the judging panel for ${e.name}`, url: `/events/${e.slug}/judging` }] : []),
+  "judge.reminded": async (_tx, f, e) => {
+    const n = Number(get(f.after, "outstanding") ?? 0);
+    return f.entityId ? [{ userId: f.entityId, category: "judging", title: `Reminder: ${n} review${n === 1 ? "" : "s"} left for ${e.name}`, url: `/events/${e.slug}/judging`, noEmail: true }] : []; // the reminder route emails already
+  },
   "assignments.batch_committed": async (tx, f, e) => {
     if (!f.entityId) return [];
     const per = await tx.assignment.groupBy({ by: ["judgeId"], where: { batchId: f.entityId }, _count: { _all: true } });
