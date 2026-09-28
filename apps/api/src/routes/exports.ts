@@ -18,6 +18,7 @@ import { computeResults, loadResultInputs, normalizeOptions } from "../judging/r
 import { reviewTarget } from "./progress";
 import { votingWindow } from "../policy";
 import { receiptHash } from "../voting/tally";
+import { exportEvent } from "../portability/export";
 
 export const exportsRouter = Router({ mergeParams: true });
 
@@ -342,6 +343,18 @@ exportsRouter.get("/", async (req, res) => {
       };
     }),
   });
+});
+
+/** The whole event as one dogfood-event/v1 file: the way out, and (via POST /api/events/import) the way back in. */
+exportsRouter.get("/event.json", async (req, res) => {
+  const event = await staffEvent(req);
+  const file = await exportEvent(prisma, event);
+  await prisma.$transaction((tx) =>
+    appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "export.downloaded", entityType: "Event", entityId: event.id, after: { file: "event.json" } }),
+  );
+  res.setHeader("Content-Disposition", `attachment; filename="${event.slug}.dogfood-event.json"`);
+  res.type("application/json").send(`${JSON.stringify(file, null, 2)}
+`);
 });
 
 exportsRouter.get("/:file", async (req: Request, res: Response) => {

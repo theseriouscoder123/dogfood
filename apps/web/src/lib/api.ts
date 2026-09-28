@@ -14,8 +14,11 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const cookieHeader = (await cookies()).toString();
+/** anonymous: call as a visitor even if someone is signed in (embeds must never show private data). */
+export async function api<T>(path: string, init: RequestInit & { anonymous?: boolean } = {}): Promise<T> {
+  const { anonymous, ...rest } = init;
+  init = rest;
+  const cookieHeader = anonymous ? "" : (await cookies()).toString();
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: { ...init.headers, ...(cookieHeader ? { cookie: cookieHeader } : {}) },

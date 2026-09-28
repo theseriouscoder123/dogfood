@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { getMe } from "@/lib/session";
@@ -20,7 +21,13 @@ export default async function NewEventPage() {
         <>
           <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-primary">New hackathon</p>
           <h1 className="text-3xl font-extrabold sm:text-4xl">Host a hackathon</h1>
-          <p className="mb-8 mt-2 text-muted">You become its first organizer. Everything here can be changed later.</p>
+          <p className="mb-8 mt-2 text-muted">
+            You become its first organizer. Everything here can be changed later. Moving an event from another Dogfood?{" "}
+            <Link href="/events/import" className="font-semibold text-primary hover:underline">
+              Import it from a file
+            </Link>
+            .
+          </p>
           <EventForm
             mode="create"
             initial={{ registrationOpensAt: null, submissionsOpenAt: null, submissionsCloseAt: null, judgingOpensAt: null, judgingClosesAt: null, maxTeamSize: 4 }}

@@ -113,8 +113,8 @@ model User {
   passwordResets PasswordReset[]
   apiTokens      ApiToken[]
   webhooks       Webhook[]
-  records        SignedRecord[] @relation("RecordSubject")
-  recordsIssued  SignedRecord[] @relation("RecordIssuer")
+  records        SignedRecord[]        @relation("RecordSubject")
+  recordsIssued  SignedRecord[]        @relation("RecordIssuer")
 }
 
 model Session {
@@ -529,20 +529,22 @@ model AuditLog {
 // ── organizer-defined submission questions ──────────────────────────────────
 
 model SubmissionQuestion {
-  id        String       @id @default(uuid()) @db.Uuid
-  eventId   String       @db.Uuid
-  label     String
-  help      String       @default("")
-  type      QuestionType
-  options   String[]     @default([]) // for single_select
-  required  Boolean      @default(false) // enforced when a project is submitted, not while drafting
-  isPublic  Boolean      @default(true) // private answers are visible to the team and organizers only
-  position  Int          @default(0)
-  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  id         String       @id @default(uuid()) @db.Uuid
+  eventId    String       @db.Uuid
+  externalId String? // id in an imported event file
+  label      String
+  help       String       @default("")
+  type       QuestionType
+  options    String[]     @default([]) // for single_select
+  required   Boolean      @default(false) // enforced when a project is submitted, not while drafting
+  isPublic   Boolean      @default(true) // private answers are visible to the team and organizers only
+  position   Int          @default(0)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
 
   event   Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
   answers ProjectAnswer[]
 
+  @@unique([eventId, externalId])
   @@index([eventId, position])
 }
 

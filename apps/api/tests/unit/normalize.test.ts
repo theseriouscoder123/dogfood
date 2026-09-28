@@ -201,3 +201,21 @@ describe("the official fixtures", () => {
     expect(rho).toBeLessThan(1);
   });
 });
+
+describe("rankBy", () => {
+  it("gives tied projects the same rank (1, 2, 2, 4) instead of splitting them by id", () => {
+    const r = rankBy([
+      { id: "b", score: 4, n: 3 },
+      { id: "a", score: 3.5, n: 3 },
+      { id: "z", score: 3.5, n: 3 },
+      { id: "c", score: 3, n: 3 },
+    ]);
+    expect([...r.entries()].sort()).toEqual([["a", 2], ["b", 1], ["c", 4], ["z", 2]]);
+  });
+
+  it("still separates equal scores backed by different numbers of reviews", () => {
+    const r = rankBy([{ id: "few", score: 4, n: 2 }, { id: "many", score: 4, n: 5 }]);
+    expect(r.get("many")).toBe(1);
+    expect(r.get("few")).toBe(2);
+  });
+});

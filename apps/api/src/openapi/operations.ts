@@ -19,6 +19,8 @@ import { BallotBody, CreateInvitesBody, QuarantineBody, ReceiptBody, RedeemBody,
 import { EXPORT_FILES } from "../routes/exports";
 import { CreateWebhookBody, DeliveriesQuery, UpdateWebhookBody } from "../routes/webhooks";
 import { RevokeRecordBody } from "../routes/records";
+import { ImportQuery } from "../routes/eventImport";
+import { EventFile } from "../portability/format";
 
 export type Method = "get" | "post" | "put" | "patch" | "delete";
 
@@ -260,6 +262,8 @@ export const OPERATIONS: Operation[] = [
 
   // ── exports ──
   { method: "get", path: `${E}/export`, tag: "Exports", summary: "Available exports with row counts", access: "organizer" },
+  { method: "get", path: `${E}/export/event.json`, tag: "Exports", summary: "The whole event as one dogfood-event/v1 file (import it with POST /api/events/import)", description: "Everything needed to run the event elsewhere: settings, tracks, prizes, rubric, questions, people, teams, projects and answers, judges, conflicts, assignments and reviews. Not included: passwords, ballots, comments, results runs, the audit log, signed records, webhooks and API tokens.", access: "organizer" },
+  { method: "post", path: "/api/events/import", tag: "Event setup", summary: "Create an event from a dogfood-event/v1 file or a DOGFOOD fixtures.json file", description: "Send the file itself as the JSON body (up to 25 MB). Every reference is checked first and all problems come back together (422 `import_invalid`, listed in `details`). With `dryRun=true` the import runs and is rolled back, so the counts are exactly what a real import would create. People are matched by email; new accounts have no password until claimed.", access: "admin", body: EventFile, query: ImportQuery, status: 201 },
   { method: "get", path: `${E}/export/:file`, tag: "Exports", summary: "Download one CSV (UTF-8 with BOM, formula-injection safe)", access: "organizer", produces: "text/csv" },
 
   // ── webhooks ──

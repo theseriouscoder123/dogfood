@@ -16844,6 +16844,993 @@
         }
       }
     },
+    "/api/events/{slug}/export/event.json": {
+      "get": {
+        "operationId": "getEventsBySlugExportEventJson",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "The whole event as one dogfood-event/v1 file (import it with POST /api/events/import)",
+        "description": "Everything needed to run the event elsewhere: settings, tracks, prizes, rubric, questions, people, teams, projects and answers, judges, conflicts, assignments and reviews. Not included: passwords, ballots, comments, results runs, the audit log, signed records, webhooks and API tokens.\n\n**Who can call this:** An organizer of the event, or a portal admin.",
+        "x-access": "organizer",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The event's URL name, e.g. \"dogfood-2026\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/import": {
+      "post": {
+        "operationId": "postEventsImport",
+        "tags": [
+          "Event setup"
+        ],
+        "summary": "Create an event from a dogfood-event/v1 file or a DOGFOOD fixtures.json file",
+        "description": "Send the file itself as the JSON body (up to 25 MB). Every reference is checked first and all problems come back together (422 `import_invalid`, listed in `details`). With `dryRun=true` the import runs and is rolled back, so the counts are exactly what a real import would create. People are matched by email; new accounts have no password until claimed.\n\n**Who can call this:** A portal admin.",
+        "x-access": "admin",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dryRun",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "description": "Check the file and report what would be created, without keeping anything.",
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "slug",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "description": "Use this slug instead of the one in the file.",
+              "type": "string",
+              "maxLength": 60,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "const": "dogfood-event/v1"
+                  },
+                  "exportedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string"
+                      },
+                      "slug": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "url",
+                      "slug"
+                    ]
+                  },
+                  "event": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "description": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      "tagline": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 160
+                      },
+                      "location": {
+                        "default": "Online",
+                        "type": "string",
+                        "maxLength": 120
+                      },
+                      "overview": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 50000
+                      },
+                      "rules": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 50000
+                      },
+                      "bannerUrl": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "logoUrl": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "timezone": {
+                        "default": "UTC",
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "registrationOpensAt": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "submissionsOpenAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "submissionsCloseAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "judgingOpensAt": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "judgingClosesAt": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "maxTeamSize": {
+                        "default": 4,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "votingOpensAt": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "votingClosesAt": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "votingMode": {
+                        "default": "email",
+                        "type": "string",
+                        "enum": [
+                          "email",
+                          "invite",
+                          "accounts"
+                        ]
+                      },
+                      "votesPerVoter": {
+                        "default": 3,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20
+                      },
+                      "voterDomains": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "commentsMode": {
+                        "default": "open",
+                        "type": "string",
+                        "enum": [
+                          "open",
+                          "read_only",
+                          "off"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name",
+                      "submissionsOpenAt",
+                      "submissionsCloseAt"
+                    ]
+                  },
+                  "people": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "required": [
+                        "email",
+                        "name"
+                      ]
+                    }
+                  },
+                  "organizers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "email"
+                    }
+                  },
+                  "tracks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "description": {
+                          "default": "",
+                          "type": "string",
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "name"
+                      ]
+                    }
+                  },
+                  "prizes": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "default": "",
+                          "type": "string"
+                        },
+                        "value": {
+                          "default": "",
+                          "type": "string"
+                        },
+                        "rank": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "track": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  },
+                  "criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "description": {
+                          "default": "",
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "weight": {
+                          "default": 1,
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 100
+                        },
+                        "minScore": {
+                          "default": 1,
+                          "type": "integer"
+                        },
+                        "maxScore": {
+                          "default": 5,
+                          "type": "integer"
+                        },
+                        "position": {
+                          "default": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "label"
+                      ]
+                    }
+                  },
+                  "questions": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "help": {
+                          "default": "",
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "short_text",
+                            "long_text",
+                            "url",
+                            "single_select",
+                            "checkbox"
+                          ]
+                        },
+                        "options": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "required": {
+                          "default": false,
+                          "type": "boolean"
+                        },
+                        "isPublic": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "position": {
+                          "default": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "label",
+                        "type"
+                      ]
+                    }
+                  },
+                  "judges": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "person": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "ref": {
+                          "default": null,
+                          "description": "the judge's imported id, e.g. jdg_24",
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tracks": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          }
+                        }
+                      },
+                      "required": [
+                        "person"
+                      ]
+                    }
+                  },
+                  "teams": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "members": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "person": {
+                                "type": "string",
+                                "format": "email"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "captain",
+                                  "member"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "person",
+                              "role"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "name",
+                        "members"
+                      ]
+                    }
+                  },
+                  "projects": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "team": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "track": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "tagline": {
+                          "default": "",
+                          "type": "string"
+                        },
+                        "description": {
+                          "default": "",
+                          "type": "string"
+                        },
+                        "repoUrl": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 2000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "demoUrl": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 2000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "videoUrl": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 2000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "thumbnailUrl": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 2000
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "techTags": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "draft",
+                            "submitted",
+                            "withdrawn",
+                            "disqualified"
+                          ]
+                        },
+                        "submittedAt": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "duplicateOf": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "answers": {
+                          "default": {},
+                          "description": "question ref → answer",
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "team",
+                        "track",
+                        "title",
+                        "status"
+                      ]
+                    }
+                  },
+                  "conflicts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "judge": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "team": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "declared",
+                            "detected"
+                          ]
+                        },
+                        "note": {
+                          "default": "",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "judge",
+                        "team",
+                        "source"
+                      ]
+                    }
+                  },
+                  "assignments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "judge": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "project": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "assigned",
+                            "in_progress",
+                            "submitted",
+                            "recused"
+                          ]
+                        },
+                        "recusalReason": {
+                          "default": null,
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "review": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "draft",
+                                    "submitted"
+                                  ]
+                                },
+                                "submittedAt": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "comment": {
+                                  "default": "",
+                                  "type": "string"
+                                },
+                                "scores": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "status",
+                                "scores"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "judge",
+                        "project",
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "format",
+                  "event",
+                  "people",
+                  "tracks",
+                  "criteria",
+                  "judges",
+                  "teams",
+                  "projects",
+                  "assignments"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation; `details` lists the issues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API token is invalid, expired or revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this caller, or the API token lacks the scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. See `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any other error. Every error has this shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events/{slug}/export/{file}": {
       "get": {
         "operationId": "getEventsBySlugExportByFile",

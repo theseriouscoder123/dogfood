@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
+import { Download, FileJson, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ExportItem } from "@/lib/types";
 import { buttonClass, Card } from "@/components/ui";
@@ -17,6 +17,22 @@ export default async function ExportsPage({ params }: { params: Promise<{ slug: 
         <h1 className="mb-1 text-3xl font-extrabold">Exports</h1>
         <p className="text-sm text-muted">Your data, as CSV, at every stage. Open them in any spreadsheet or feed them to your own analysis.</p>
       </div>
+
+      <section className="flex flex-col gap-4 rounded-2xl border border-primary/25 bg-primary-soft/50 p-5 sm:flex-row sm:items-center">
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-ink">
+          <FileJson className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-bold">The whole event, in one file</h2>
+          <p className="text-sm text-ink-2">
+            Settings, tracks, prizes, rubric, people, teams, projects, judges and every review, as <code className="font-mono text-xs">dogfood-event/v1</code> JSON. Import it into
+            any Dogfood install (Import an event) and you get the same event back, with the same ranking. Passwords, ballots, comments and signed records stay here.
+          </p>
+        </div>
+        <a href={`/api/events/${encodeURIComponent(slug)}/export/event.json`} download className={buttonClass("primary", "md")}>
+          <Download className="size-4" /> Full event (.json)
+        </a>
+      </section>
 
       {STAGES.map((stage) => {
         const items = exports.filter((x) => x.stage === stage);

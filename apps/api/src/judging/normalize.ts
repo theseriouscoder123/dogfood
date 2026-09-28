@@ -110,7 +110,17 @@ export function normalize(input: Observation[], params: NormalizeParams = DEFAUL
 /** Rank items by score (higher first); ties broken by more reviews, then id, so ranks are stable. */
 export function rankBy<T extends { id: string; score: number; n: number }>(items: T[]): Map<string, number> {
   const sorted = [...items].sort((x, y) => y.score - x.score || y.n - x.n || x.id.localeCompare(y.id));
-  return new Map(sorted.map((x, i) => [x.id, i + 1]));
+  // Competition ranking ("1, 2, 2, 4"): projects the data can't separate (same score, same number of
+  // reviews) share a rank. Splitting them by id would be arbitrary, and would change when the event
+  // is exported and imported elsewhere, because ids do.
+  const ranks = new Map<string, number>();
+  let rank = 0;
+  sorted.forEach((x, i) => {
+    const prev = sorted[i - 1];
+    if (!prev || Math.abs(prev.score - x.score) > 1e-9 || prev.n !== x.n) rank = i + 1;
+    ranks.set(x.id, rank);
+  });
+  return ranks;
 }
 
 /**

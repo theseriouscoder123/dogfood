@@ -14,7 +14,7 @@ with ridge shrinkage on both effects (λ_judge = 2, λ_project = 0.5). A judge's
 
 - 40 projects ranked from 122 reviews by 30 judges (4 reviews not counted: duplicates or excluded judges).
 - Judge–project graph: **1 connected component**, so every judge's leniency is comparable with every other's.
-- Scoring noise σ = 0.70 on the 1–5 scale. Agreement between raw and adjusted ranking: Spearman ρ = 0.965 (33 projects moved).
+- Scoring noise σ = 0.70 on the 1–5 scale. Agreement between raw and adjusted ranking: Spearman ρ = 0.969 (31 projects moved).
 
 - Inter-rater reliability: ICC(1) = 0.000 for a single review, ICC(1,k) = 0.000 for the average of ~3.04 reviews. **Judges agree with each other little more than chance.** No normalization can create signal that the scores don't contain; treat close ranks as ties and consider more reviews per project.
 
@@ -28,39 +28,39 @@ with ridge shrinkage on both effects (λ_judge = 2, λ_project = 0.5). A judge's
 | 4 | ▲1 | prj_37 Salt Loom | 4 | 4.08 | 4.01 | #1–23 |  |
 | 5 | ▲1 | prj_16 Salt Kiln | 3 | 4.00 | 3.95 | #1–27 |  |
 | 6 | ▼3 | prj_10 Still Beacon | 2 | 4.17 | 3.90 | #1–31 | provisional |
-| 7 | · | prj_33 Slow Trail | 3 | 4.00 | 3.89 | #2–28 |  |
+| 7 | ▼1 | prj_33 Slow Trail | 3 | 4.00 | 3.89 | #2–28 |  |
 | 8 | · | prj_21 Copper Kiln | 3 | 3.89 | 3.77 | #2–31 |  |
 | 9 | · | prj_08 North Drift | 5 | 3.80 | 3.76 | #3–28 |  |
-| 10 | ▲1 | prj_38 Deep Beacon | 3 | 3.78 | 3.75 | #2–32 |  |
+| 10 | · | prj_38 Deep Beacon | 3 | 3.78 | 3.75 | #2–32 |  |
 | 11 | ▼1 | prj_04 Green Switch | 3 | 3.78 | 3.70 | #3–33 |  |
 | 12 | · | prj_15 Copper Orbit | 2 | 3.67 | 3.66 | #2–36 | provisional |
 | 13 | ▲1 | prj_36 Salt Drift | 3 | 3.67 | 3.61 | #4–35 |  |
 | 14 | ▲5 | prj_18 Open Kiln | 2 | 3.50 | 3.57 | #3–37 | provisional |
 | 15 | · | prj_09 Hollow Signal | 3 | 3.56 | 3.56 | #4–36 |  |
-| 16 | · | prj_17 Small Loom | 3 | 3.56 | 3.56 | #4–36 |  |
-| 17 | ▲3 | prj_24 Glass Beacon | 2 | 3.50 | 3.55 | #3–38 | provisional |
-| 18 | ▼5 | prj_19 Small Relay | 2 | 3.67 | 3.54 | #3–38 | provisional |
-| 19 | ▲5 | prj_12 Open Beacon | 3 | 3.44 | 3.52 | #5–36 |  |
-| 20 | ▼3 | prj_31 Salt Ferry | 3 | 3.56 | 3.50 | #5–36 |  |
-| 21 | ▼3 | prj_02 Small Meadow | 3 | 3.56 | 3.49 | #5–37 |  |
+| 15 | · | prj_17 Small Loom | 3 | 3.56 | 3.56 | #4–36 |  |
+| 17 | ▲2 | prj_24 Glass Beacon | 2 | 3.50 | 3.55 | #3–38 | provisional |
+| 18 | ▼6 | prj_19 Small Relay | 2 | 3.67 | 3.54 | #3–38 | provisional |
+| 19 | ▲4 | prj_12 Open Beacon | 3 | 3.44 | 3.52 | #5–36 |  |
+| 20 | ▼5 | prj_31 Salt Ferry | 3 | 3.56 | 3.50 | #5–36 |  |
+| 21 | ▼6 | prj_02 Small Meadow | 3 | 3.56 | 3.49 | #5–37 |  |
 | 22 | ▲1 | prj_01 Glass Signal | 3 | 3.44 | 3.47 | #5–37 |  |
 | 23 | ▲5 | prj_14 Green Lantern | 5 | 3.40 | 3.45 | #9–36 |  |
-| 24 | ▲1 | prj_27 Flat Thread | 3 | 3.44 | 3.42 | #6–38 |  |
+| 24 | ▼1 | prj_27 Flat Thread | 3 | 3.44 | 3.42 | #6–38 |  |
 | 25 | ▲7 | prj_07 Dry Harbour | 5 | 3.33 | 3.42 | #9–36 |  |
-| 26 | ▲1 | prj_32 Loud Ledger | 3 | 3.44 | 3.41 | #7–38 |  |
+| 26 | ▼3 | prj_32 Loud Ledger | 3 | 3.44 | 3.41 | #7–38 |  |
 | 27 | ▲4 | prj_29 Flat Relay | 2 | 3.33 | 3.41 | #4–39 | provisional |
-| 28 | ▼7 | prj_39 Paper Anchor | 2 | 3.50 | 3.40 | #5–39 | provisional |
+| 28 | ▼9 | prj_39 Paper Anchor | 2 | 3.50 | 3.40 | #5–39 | provisional |
 | 29 | ▼7 | prj_35 Warm Beacon | 5 | 3.47 | 3.36 | #10–37 |  |
 | 30 | ▼1 | prj_03 Deep Compass | 3 | 3.33 | 3.34 | #8–39 |  |
-| 31 | ▼5 | prj_28 Flat Meadow | 3 | 3.44 | 3.29 | #10–39 |  |
-| 32 | ▼2 | prj_13 Quiet Anchor | 3 | 3.33 | 3.28 | #8–39 |  |
-| 33 | ▲4 | prj_30 Paper Harbour | 3 | 3.11 | 3.23 | #11–39 |  |
+| 31 | ▼8 | prj_28 Flat Meadow | 3 | 3.44 | 3.29 | #10–39 |  |
+| 32 | ▼3 | prj_13 Quiet Anchor | 3 | 3.33 | 3.28 | #8–39 |  |
+| 33 | ▲2 | prj_30 Paper Harbour | 3 | 3.11 | 3.23 | #11–39 |  |
 | 34 | ▼1 | prj_20 Paper Thread | 3 | 3.22 | 3.23 | #11–39 |  |
-| 35 | ▲1 | prj_22 Dry Bridge | 3 | 3.11 | 3.18 | #12–40 |  |
-| 36 | ▼2 | prj_26 Amber Hours | 3 | 3.22 | 3.18 | #12–40 |  |
+| 35 | · | prj_22 Dry Bridge | 3 | 3.11 | 3.18 | #12–40 |  |
+| 36 | ▼3 | prj_26 Amber Hours | 3 | 3.22 | 3.18 | #12–40 |  |
 | 37 | ▼2 | prj_06 Dry Compass | 3 | 3.11 | 3.12 | #13–40 |  |
 | 38 | · | prj_40 Slow Loom | 2 | 3.00 | 3.04 | #12–40 | provisional |
-| 39 | ▲1 | prj_23 Slow Quarry | 3 | 2.89 | 2.95 | #18–40 |  |
+| 39 | · | prj_23 Slow Quarry | 3 | 2.89 | 2.95 | #18–40 |  |
 | 40 | ▼1 | prj_05 North Compass | 3 | 2.89 | 2.92 | #21–40 |  |
 | – |  | prj_41 Dry Harbour | 0 | – | – | – | duplicate |
 
@@ -105,33 +105,33 @@ We keep this event's exact judge–project pairs and simulate 300 events on them
 
 | Method | Mean ρ vs truth | 10th percentile ρ | Picks the true winner | True top 5 found |
 |---|---:|---:|---:|---:|
-| Raw average | 0.773 | 0.665 | 37% | 57% |
+| Raw average | 0.788 | 0.691 | 37% | 60% |
 | Per-judge z-score | 0.747 | 0.637 | 29% | 53% |
-| **Additive + shrinkage (ours)** | 0.805 | 0.720 | 40% | 61% |
+| **Additive + shrinkage (ours)** | 0.806 | 0.720 | 40% | 61% |
 
 **Control: what if judges are perfectly fair?** The same simulation with zero leniency, which prices the insurance:
 
 | Method | Mean ρ vs truth |
 |---|---:|
-| Raw average | 0.836 |
+| Raw average | 0.851 |
 | Per-judge z-score | 0.745 |
-| Additive + shrinkage | 0.828 |
+| Additive + shrinkage | 0.829 |
 
 **Sensitivity to λ_judge** (λ_project fixed):
 
 | λ_judge | Mean ρ |
 |---:|---:|
-| 0.5 | 0.804 |
+| 0.5 | 0.805 |
 | 1 | 0.808 |
-| 2 (default) | 0.805 |
+| 2 (default) | 0.806 |
 | 4 | 0.799 |
-| 8 | 0.791 |
+| 8 | 0.792 |
 
 ### Reading the numbers
 
-- When judges differ in leniency, the additive model recovers the true order better than raw averages (ρ 0.805 vs 0.773).
+- When judges differ in leniency, the additive model recovers the true order better than raw averages (ρ 0.806 vs 0.788).
 - Per-judge z-scores do *worse* than doing nothing (ρ 0.747): with a handful of reviews per judge, a standard deviation estimated from 3–5 numbers is mostly noise, and dividing by it amplifies that noise.
-- When judges are fair, the model costs 0.008 ρ against raw averages: cheap insurance.
+- When judges are fair, the model costs 0.022 ρ against raw averages: cheap insurance.
 - Results change little across λ_judge from 0.5 to 4, so the default is not a fragile choice.
 
 ## Integrity checks

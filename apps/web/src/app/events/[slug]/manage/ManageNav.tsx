@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Award, CalendarClock, Download, Webhook, Heart, Medal, MessageSquare, ShieldAlert, ShieldCheck, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
+import { Activity, Award, CalendarClock, Code2, Download, Webhook, Heart, Medal, MessageSquare, ShieldAlert, ShieldCheck, FileQuestion, Gavel, Gift, LayoutDashboard, Layers, Network, Palette, Scale, UserCog } from "lucide-react";
 
 const GROUPS = [
   {
@@ -42,6 +42,7 @@ const GROUPS = [
     items: [
       { path: "/exports", label: "Exports", icon: Download },
       { path: "/webhooks", label: "Webhooks", icon: Webhook },
+      { path: "/embed", label: "Embed", icon: Code2 },
     ],
   },
 ];

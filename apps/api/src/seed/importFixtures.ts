@@ -43,9 +43,9 @@ export type ImportSummary = {
 
 const HOUR = 3_600_000;
 
-const slugify = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-const titleCase = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-const nameFromEmail = (email: string) => titleCase(email.split("@")[0]!.replace(/[0-9._]+/g, " ").trim() || email);
+export const slugify = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+export const titleCase = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+export const nameFromEmail = (email: string) => titleCase(email.split("@")[0]!.replace(/[0-9._]+/g, " ").trim() || email);
 
 function lookup<V>(map: Map<string, V>, key: string, what: string): V {
   const v = map.get(key);

@@ -23,13 +23,17 @@ import { tokensRouter } from "./routes/tokens";
 import { metaRouter } from "./routes/meta";
 import { webhooksRouter } from "./routes/webhooks";
 import { recordsAdminRouter, recordsRouter } from "./routes/records";
+import { eventImportRouter } from "./routes/eventImport";
 
 /**
  * Every router and where it is mounted, in mount order. The OpenAPI drift test walks this table,
- * so a route can't be added without being documented. Uploads read the raw body, so they come
- * before the JSON parser.
+ * so a route can't be added without being documented. Uploads and event import parse their own
+ * (bigger) bodies, so they come before the JSON parser.
  */
-export const RAW_BODY_MOUNTS: ReadonlyArray<readonly [string, Router]> = [["/api/uploads", uploadsRouter]];
+export const RAW_BODY_MOUNTS: ReadonlyArray<readonly [string, Router]> = [
+  ["/api/uploads", uploadsRouter],
+  ["/api/events/import", eventImportRouter], // whole-event files are bigger than the global JSON limit
+];
 
 export const MOUNTS: ReadonlyArray<readonly [string, Router]> = [
   ["/api", metaRouter],

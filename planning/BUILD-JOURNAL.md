@@ -165,3 +165,24 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - Pages: *My certificates* for each person, and *Manage → Certificates* (issue, re-issue changed, revoke with a reason).
   - A `records.issued` webhook fires on issuing.
   - The seed signs 121 records for the sample event (30 judges, 91 participants).
+- **Mon · T4 phase 4 (bulk import/export and embed)** `dogfood-event/v1` is one JSON file per event, holding:
+  - settings, tracks, prizes, rubric and questions;
+  - people, organizers, judges (with their imported ids) and teams;
+  - projects with answers and duplicate links;
+  - conflicts, assignments, and reviews with scores.
+
+  People are referenced by email, everything else by its imported id if it has one, otherwise its uuid. Exports are sorted, so the same event always gives the same file.
+  - **Deliberately left out:** passwords (accounts are claimed again), ballots (bound to identity checks that don't transfer), comments (third-party speech), and anything bound to this install (results runs, audit chain, signed records, webhooks, tokens). Results are recomputed from the reviews.
+  - **Import** (`POST /api/events/import`, admin only) takes v1 or the DOGFOOD fixture format through an adapter. It checks every reference first and reports all problems at once. Then it writes the event in one transaction. Existing accounts are reused by email and never modified; new accounts have no password.
+  - **Dry run** is the real import, rolled back, so the preview can't disagree with the actual import. A test shows the event, user and audit counts are unchanged afterwards.
+- **Mon** Tests prove the round trip: export → import → export gives the same file, *and* the same judged ranking. The fixture adapter and the seed importer are cross-checked too: both build identical events from fixtures.json, which turns their duplicated logic into a test.
+- **Mon** Two real bugs found by the round-trip test:
+  - "One live project per team" is a partial unique index. Linking duplicates *after* inserting briefly gave a team two live projects. The link is now set in the same insert, whose foreign key is checked at the end of the statement.
+  - **Exact ties were split by uuid.** prj_09 and prj_17 have identical normalized scores and review counts, and `rankBy` broke the tie by project id. That's arbitrary, and it changes when ids change (an import). Ties now share a rank ("1, 2, 2, 4"), as People's Choice already did; there are unit tests for this. `docs/normalization-proof.md` was regenerated; only rank numbers and the movement arrows changed.
+- **Mon** Embed:
+  - `/embed/:slug` is a chrome-free gallery with search, track chips and top-three medals once results are out. Links open on the portal in a new tab.
+  - It's always rendered as an **anonymous** visitor (the server API client got an `anonymous` option). A signed-in organizer looking at a sponsor's page never pulls private data into it, and there's nothing in it to clickjack.
+  - That's what justifies the framing policy: `/embed/*` sends `frame-ancestors *`; every other page sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`. Checked with curl.
+  - `public/embed.js` is one script tag with data-attributes. It inserts the iframe and auto-sizes it from `postMessage` height updates, accepted only when they come from its own iframe and the portal's origin.
+  - Tested from a real third-party origin (a host page on :5500): the gallery rendered and sized itself so the host's footer sits right below it.
+  - *Manage → Embed* has options, script or iframe code, and a live preview. *Manage → Exports* gained "Full event (.json)"; admins get *Import an event* with a preview-then-import wizard. The gateway body limit was raised to 26 MB for imports.
