@@ -224,3 +224,13 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - Event hub on phones: the status card now sits under the content except on Overview, and the active tab scrolls into view.
   - Trimmed the progress page subtitle.
 - **Checks.** Tests: 400 unit, 178 integration. Checker: T1 T2 verified.
+
+## Step-by-step create flow (Sep 28)
+
+- `/events/new` is now a five-step wizard (`app/events/new/CreateWizard.tsx`): Basics → Schedule → Tracks & prizes → Judging → Review.
+  - **Schedule:** Weekend, Week-long and Month-long presets fill all five dates from one start time. Registration opens two weeks ahead, clamped to now. The client runs the same ordering checks as the server's `scheduleProblems`, so problems show before the last step.
+  - **Rubric:** Standard (four weighted criteria, 1–5), Single score (1–10), or Set up later.
+  - **Create:** nothing is written until the last step. That step creates the draft event, then its tracks, prizes and criteria through the existing endpoints. Any partial failure is reported in a toast, and the wizard then opens the organizer console.
+  - **Autosave:** the half-filled wizard is kept in localStorage.
+- `EventForm` is now schedule-only (organizer console).
+- **Verified:** one event created in the browser end to end, with its track, prize and 4-criterion rubric present, checked through the API.

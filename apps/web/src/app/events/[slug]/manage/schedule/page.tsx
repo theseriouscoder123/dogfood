@@ -8,7 +8,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ slug:
     <div>
       <h1 className="mb-1 text-3xl font-extrabold">Schedule</h1>
       <p className="mb-6 text-sm text-muted">All times are in UTC. The server enforces every one of these dates.</p>
-      <EventForm mode="schedule" slug={slug} initial={event} />
+      <EventForm slug={slug} initial={event} />
     </div>
   );
 }
