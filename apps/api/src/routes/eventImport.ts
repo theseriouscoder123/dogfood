@@ -3,7 +3,7 @@
 import express, { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
-import { decideCreateEvent, enforce } from "../policy";
+import { decideImportEvent, enforce } from "../policy";
 import { fromRequest } from "../audit";
 import { HttpError } from "../lib/http";
 import { FixtureFile } from "../seed/importFixtures";
@@ -22,7 +22,7 @@ export const ImportQuery = z.object({
 });
 
 eventImportRouter.post("/", express.json({ limit: "25mb" }), async (req, res) => {
-  enforce(decideCreateEvent(req.actor));
+  enforce(decideImportEvent(req.actor));
   const { dryRun, slug } = ImportQuery.parse(req.query);
   const body = req.body as { format?: unknown } | undefined;
   let file: EventFile;

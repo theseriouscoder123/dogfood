@@ -7,7 +7,7 @@ export const metadata = { title: "Log in" };
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
   // Only allow same-site relative redirects after login.
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 
   return (
     <AuthShell

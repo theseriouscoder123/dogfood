@@ -3,6 +3,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
+import { config } from "../config";
 import { accessFor, decideCreateEvent, decideOrganize, decideParticipate, enforce, registrationWindow } from "../policy";
 import { appendAudit, fromRequest } from "../audit";
 import { eventBySlug } from "../lib/events";
@@ -63,7 +64,7 @@ async function staffEvent(req: import("express").Request) {
 // ── events ──────────────────────────────────────────────────────────────────
 
 eventAdminRouter.post("/", async (req, res) => {
-  enforce(decideCreateEvent(req.actor));
+  enforce(decideCreateEvent(req.actor, config.hosting));
   const body = CreateEvent.parse(req.body);
   const schedule = {
     registrationOpensAt: body.registrationOpensAt ?? null,
@@ -84,6 +85,8 @@ eventAdminRouter.post("/", async (req, res) => {
         description: body.description ?? "", tagline: body.tagline ?? "", location: body.location ?? "Online",
         overview: body.overview ?? "", rules: body.rules ?? "", bannerUrl: body.bannerUrl ?? null, logoUrl: body.logoUrl ?? null,
         timezone: body.timezone ?? "UTC", maxTeamSize: body.maxTeamSize ?? 4,
+        publishedAt: null, // a draft until its organizers publish it
+        createdById: req.actor!.id,
       },
     });
     await tx.eventRole.create({ data: { eventId: created.id, userId: req.actor!.id, role: "organizer" } });
@@ -112,6 +115,33 @@ eventAdminRouter.patch("/:slug", async (req, res) => {
     return u;
   });
   res.json({ event: { slug: updated.slug, name: updated.name } });
+});
+
+/** Make a draft event public: it appears in listings and people can register. */
+eventAdminRouter.post("/:slug/publish", async (req, res) => {
+  const event = await staffEvent(req);
+  if (event.publishedAt) {
+    res.json({ publishedAt: event.publishedAt });
+    return;
+  }
+  const u = await prisma.$transaction(async (tx) => {
+    const u = await tx.event.update({ where: { id: event.id }, data: { publishedAt: new Date() } });
+    await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "event.published", entityType: "Event", entityId: event.id });
+    return u;
+  });
+  res.json({ publishedAt: u.publishedAt });
+});
+
+/** Back to draft: only while nobody has joined, so no one loses access to something they're part of. */
+eventAdminRouter.post("/:slug/unpublish", async (req, res) => {
+  const event = await staffEvent(req);
+  const joined = await prisma.eventRole.count({ where: { eventId: event.id, role: { in: ["participant", "judge"] } } });
+  if (joined > 0) throw new HttpError(409, "event_has_people", "People have already joined this event, so it can't go back to draft.");
+  await prisma.$transaction(async (tx) => {
+    await tx.event.update({ where: { id: event.id }, data: { publishedAt: null } });
+    await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "event.unpublished", entityType: "Event", entityId: event.id });
+  });
+  res.json({ publishedAt: null });
 });
 
 // ── participant self-registration ───────────────────────────────────────────

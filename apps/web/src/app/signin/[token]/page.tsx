@@ -31,7 +31,7 @@ export default function SignInLinkPage({ params }: { params: Promise<{ token: st
             const r = await send<{ next: string }>("POST", "/api/auth/link/verify", { token });
             setPending(false);
             if (!r.ok) return setError(r.message);
-            router.replace(r.data.next || "/");
+            router.replace(r.data.next && r.data.next !== "/" ? r.data.next : "/dashboard");
             router.refresh();
           }}
         >

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialog } from "@/components/feedback";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Check, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { send } from "@/lib/client";
@@ -410,6 +411,7 @@ function QuestionForm({ initial, onSubmit, onCancel, pending }: {
 }
 
 export function QuestionsEditor({ slug, questions }: { slug: string; questions: Question[] }) {
+  const ask = useDialog();
   const { run, error, pending } = useAction();
   const [editing, setEditing] = useState<string | null>(null);
   const move = (q: Question, dir: -1 | 1) => {
@@ -478,7 +480,7 @@ export function QuestionsEditor({ slug, questions }: { slug: string; questions: 
                         variant="ghost"
                         size="sm"
                         disabled={pending}
-                        onClick={() => confirm("Delete this question and all its answers?") && void run("DELETE", `/api/events/${slug}/questions/${q.id}`)}
+                        onClick={async () => (await ask.confirm({ title: "Delete this question?", body: "Its answers are deleted too.", confirmLabel: "Delete", danger: true })) && void run("DELETE", `/api/events/${slug}/questions/${q.id}`)}
                         aria-label="Delete question"
                       >
                         <Trash2 className="size-4" />

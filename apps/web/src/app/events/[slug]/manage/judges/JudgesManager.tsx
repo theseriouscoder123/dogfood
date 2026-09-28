@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialog } from "@/components/feedback";
 import { useRouter } from "next/navigation";
 import { Check, Mail, Pencil, ShieldAlert, Trash2, UserPlus, X } from "lucide-react";
 import { send } from "@/lib/client";
@@ -38,6 +39,7 @@ function TrackPicker({ tracks, value, onChange }: { tracks: Track[]; value: stri
 }
 
 export function JudgesManager({ slug, judges, tracks, teams, conflicts }: { slug: string; judges: JudgeRow[]; tracks: Track[]; teams: TeamRow[]; conflicts: ConflictRow[] }) {
+  const ask = useDialog();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -200,7 +202,7 @@ export function JudgesManager({ slug, judges, tracks, teams, conflicts }: { slug
                           size="sm"
                           variant="ghost"
                           disabled={pending}
-                          onClick={() => confirm(`Remove ${j.name} from the panel?`) && void run("DELETE", `${base}/judges/${j.id}`)}
+                          onClick={async () => (await ask.confirm({ title: `Remove ${j.name}?`, confirmLabel: "Remove", danger: true })) && void run("DELETE", `${base}/judges/${j.id}`)}
                           aria-label={`Remove ${j.name}`}
                         >
                           <Trash2 className="size-4" />

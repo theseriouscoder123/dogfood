@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialog } from "@/components/feedback";
 import Link from "next/link";
 import { Flag, MessageSquare, Pencil, Reply, Trash2 } from "lucide-react";
 import { send } from "@/lib/client";
@@ -155,6 +156,7 @@ export function CommentThread({ slug, projectId, initial }: { slug: string; proj
 }
 
 function CommentItem({ c, canReply, act }: { c: CommentView & { replies?: CommentView[] }; canReply: boolean; act: (m: string, p: string, b?: unknown) => Promise<boolean> }) {
+  const ask = useDialog();
   const [mode, setMode] = useState<"reply" | "edit" | "report" | null>(null);
   const [reason, setReason] = useState("spam");
   const [note, setNote] = useState("");
@@ -211,8 +213,8 @@ function CommentItem({ c, canReply, act }: { c: CommentView & { replies?: Commen
             )}
             {c.canDelete && (
               <button
-                onClick={() => {
-                  if (window.confirm("Delete this comment? This can't be undone.")) void act("DELETE", `/${c.id}`);
+                onClick={async () => {
+                  if (await ask.confirm({ title: "Delete this comment?", confirmLabel: "Delete", danger: true })) void act("DELETE", `/${c.id}`);
                 }}
                 className="inline-flex items-center gap-1 hover:text-danger"
               >

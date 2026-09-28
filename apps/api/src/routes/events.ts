@@ -9,6 +9,7 @@ export const eventsRouter = Router();
 /** Public event listing, with what an event card needs (branding, counts, prize summary). */
 eventsRouter.get("/", async (_req, res) => {
   const events = await prisma.event.findMany({
+    where: { publishedAt: { not: null } },
     orderBy: { submissionsCloseAt: "desc" },
     select: {
       id: true, slug: true, name: true, description: true, tagline: true, location: true, bannerUrl: true, logoUrl: true,
@@ -81,6 +82,7 @@ eventsRouter.get("/:slug", async (req, res) => {
       votingMode: event.votingMode,
       votesPerVoter: event.votesPerVoter,
       votingPublished: event.votingPublishedAt !== null,
+      publishedAt: event.publishedAt,
     },
     stats: { participants: participantCount, teams: teamCount, projects: projectCount, prizeTotal: prizeTotal(prizes.map((p) => p.value)) },
     tracks: tracks.map(({ _count, ...t }) => ({ ...t, projectCount: _count.projects })),

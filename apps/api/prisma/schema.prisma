@@ -90,6 +90,16 @@ model User {
   passwordHash    String? // null = cannot log in with a password (e.g. imported, not yet claimed)
   emailVerifiedAt DateTime? @db.Timestamptz(3) // set when the user proves they read this inbox (sign-in link, reset link)
   isAdmin         Boolean   @default(false) // the only global role; everything else is per event
+  // public profile (never the email)
+  handle          String?   @unique // /u/<handle>; lower-case letters, digits, dashes
+  headline        String    @default("")
+  bio             String    @default("")
+  avatarUrl       String?
+  location        String    @default("")
+  website         String?
+  githubUrl       String?
+  linkedinUrl     String?
+  skills          String[]  @default([])
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
 
   sessions       Session[]
@@ -115,6 +125,7 @@ model User {
   webhooks       Webhook[]
   records        SignedRecord[]        @relation("RecordSubject")
   recordsIssued  SignedRecord[]        @relation("RecordIssuer")
+  eventsCreated  Event[]               @relation("EventCreator")
 }
 
 model Session {
@@ -160,10 +171,13 @@ model Event {
   votingPublishedAt   DateTime?    @db.Timestamptz(3) // People's Choice results made public
   votingBallotsHash   String? // SHA-256 of the published ballot file, fixed at publish time
   publishedRunId      String?      @unique @db.Uuid // null = results hidden
+  publishedAt         DateTime?    @default(now()) @db.Timestamptz(3) // null = draft: visible to its organizers only
+  createdById         String?      @db.Uuid
   createdAt           DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime     @updatedAt @db.Timestamptz(3)
 
   publishedRun NormalizationRun?     @relation("PublishedRun", fields: [publishedRunId], references: [id])
+  createdBy    User?                 @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
   roles        EventRole[]
   tracks       Track[]
   prizes       Prize[]

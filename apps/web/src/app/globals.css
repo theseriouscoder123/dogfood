@@ -149,3 +149,8 @@ h1, h2, h3, .font-display {
 .prose th, .prose td { border: 1px solid var(--line); padding: 0.45em 0.7em; text-align: left; }
 .prose th { background: var(--surface-2); color: var(--ink); }
 .prose hr { border: 0; border-top: 1px solid var(--line); }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}

@@ -55,6 +55,7 @@ export type EventDetail = {
     submissionWindow: SubmissionWindow;
     registrationWindow: SubmissionWindow;
     resultsPublished: boolean;
+    publishedAt: string | null;
     votingOpensAt: string | null;
     votingClosesAt: string | null;
     votingWindow: VotingWindow;

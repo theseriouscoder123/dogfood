@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useDialog } from "@/components/feedback";
 import { Check, Copy, Eye, KeyRound, PencilLine, ShieldAlert, Trash2 } from "lucide-react";
 import { send } from "@/lib/client";
 import type { ApiToken, ApiTokenList } from "@/lib/types";
@@ -18,6 +19,7 @@ const LIFETIMES: Array<{ days: number | null; label: string }> = [
 const STATE_TONE = { active: "success", expired: "neutral", revoked: "danger" } as const;
 
 export function TokenManager({ initial, email }: { initial: ApiTokenList; email: string }) {
+  const ask = useDialog();
   const [tokens, setTokens] = useState(initial.tokens);
   const [name, setName] = useState("");
   const [write, setWrite] = useState(false);
@@ -45,7 +47,7 @@ export function TokenManager({ initial, email }: { initial: ApiTokenList; email:
   }
 
   async function revoke(t: ApiToken) {
-    if (!confirm(`Revoke "${t.name}"? Anything using it stops working immediately. This can't be undone.`)) return;
+    if (!(await ask.confirm({ title: `Revoke “${t.name}”?`, body: "Anything using it stops working immediately.", confirmLabel: "Revoke", danger: true }))) return;
     const r = await send("DELETE", `/api/auth/tokens/${t.id}`);
     if (!r.ok) return setError(r.message);
     if (created?.token.id === t.id) setCreated(null);

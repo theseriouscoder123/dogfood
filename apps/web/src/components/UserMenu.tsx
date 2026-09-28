@@ -66,11 +66,9 @@ export function UserMenu({ user, events }: Props) {
             </div>
           )}
           <div className="py-2">
-            {user.isAdmin && (
-              <Link href="/events/new" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-2">
-                <PlusCircle className="size-4 text-muted" /> Host a hackathon
-              </Link>
-            )}
+            <Link href="/events/new" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-2">
+              <PlusCircle className="size-4 text-muted" /> Host a hackathon
+            </Link>
             {user.isAdmin && (
               <Link href="/events/import" onClick={() => setOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface-2">
                 <Upload className="size-4 text-muted" /> Import an event

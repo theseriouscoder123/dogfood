@@ -8,7 +8,7 @@ export default function NotFound() {
       <h1 className="mt-3 text-2xl font-extrabold">This page doesn&apos;t exist</h1>
       <p className="mt-2 text-muted">It may have been moved, or you may not have access to it.</p>
       <Link href="/" className={buttonClass("primary", "lg", "mt-8")}>
-        Back to hackathons
+        Back to Dogfood
       </Link>
     </div>
   );

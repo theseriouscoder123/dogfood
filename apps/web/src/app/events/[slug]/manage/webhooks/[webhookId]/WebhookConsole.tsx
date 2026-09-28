@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
+import { useDialog } from "@/components/feedback";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ChevronDown, Clock, KeyRound, Pause, Pencil, Play, RefreshCw, Send, Trash2, XCircle } from "lucide-react";
@@ -33,6 +34,7 @@ const STATUS = {
 } as const;
 
 export function WebhookConsole({ slug, detail, eventTypes, filter, counts }: Props) {
+  const ask = useDialog();
   const router = useRouter();
   const w = detail.webhook;
   const base = `/api/events/${slug}/webhooks/${w.id}`;
@@ -90,7 +92,7 @@ export function WebhookConsole({ slug, detail, eventTypes, filter, counts }: Pro
             variant="secondary"
             disabled={busy !== null}
             onClick={async () => {
-              if (!confirm("Rotate the signing secret? The old one keeps working for 24 hours so you can update your receiver.")) return;
+              if (!(await ask.confirm({ title: "Rotate the signing secret?", body: "The old secret keeps signing for 24 hours.", confirmLabel: "Rotate" }))) return;
               const d = await act("rotate", "POST", `${base}/rotate-secret`);
               if (d?.secret) setSecret(d.secret);
             }}
@@ -102,7 +104,7 @@ export function WebhookConsole({ slug, detail, eventTypes, filter, counts }: Pro
             variant="danger"
             disabled={busy !== null}
             onClick={async () => {
-              if (!confirm("Delete this endpoint and its delivery log? Nothing more will be sent to it.")) return;
+              if (!(await ask.confirm({ title: "Delete this endpoint?", body: "Its delivery log is deleted too.", confirmLabel: "Delete", danger: true }))) return;
               const r = await send("DELETE", base);
               if (r.ok) router.push(`/events/${slug}/manage/webhooks`);
               else setError(r.message);

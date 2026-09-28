@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useDialog } from "@/components/feedback";
 import { useRouter } from "next/navigation";
 import { Lock, Plus, Sparkles, Trash2 } from "lucide-react";
 import { send } from "@/lib/client";
@@ -20,6 +21,7 @@ const smallInput = inputClass.replace("mt-1.5 w-full", "").replace("px-3.5 py-2.
 const BAR_COLORS = ["#3346f0", "#9b6bff", "#ff6b35", "#14b8a6", "#f59e0b", "#db2777", "#0284c7", "#16a34a"];
 
 export function RubricEditor({ slug, rubric }: { slug: string; rubric: Rubric }) {
+  const ask = useDialog();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -103,7 +105,7 @@ export function RubricEditor({ slug, rubric }: { slug: string; rubric: Rubric })
                 pending={pending}
                 onWeight={(w) => setWeights({ ...weights, [c.id]: w })}
                 onSave={(body) => run(() => send("PATCH", `${base}/${c.id}`, body))}
-                onDelete={() => confirm(`Delete "${c.label}"?`) && void run(() => send("DELETE", `${base}/${c.id}`))}
+                onDelete={async () => (await ask.confirm({ title: `Delete “${c.label}”?`, confirmLabel: "Delete", danger: true })) && void run(() => send("DELETE", `${base}/${c.id}`))}
               />
             ))}
           </ul>

@@ -26,6 +26,8 @@ export const config = {
     .split(",")
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean),
+  /** Who may host hackathons: "open" (any signed-in user) or "admins". */
+  hosting: (process.env.HOSTING === "admins" ? "admins" : "open") as "open" | "admins",
   /** Run the webhook delivery worker inside the API process. */
   webhookWorker: bool("WEBHOOK_WORKER", true),
   /** Ed25519 private key (PEM) that signs records and certificates. Created on first use; keep it on its own volume and back it up. */

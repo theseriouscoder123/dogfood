@@ -77,7 +77,17 @@ export function decideViewProject(
 }
 
 /** Only platform admins create events; the creator becomes the event's first organizer. */
-export function decideCreateEvent(actor: Actor | null): Decision {
+/**
+ * Hosting a hackathon: any signed-in person, who becomes its organizer (the event starts as a
+ * draft, visible only to them). A platform can restrict hosting to admins with HOSTING=admins.
+ */
+export function decideCreateEvent(actor: Actor | null, hosting: "open" | "admins" = "open"): Decision {
+  if (!actor) return "unauthenticated";
+  return actor.isAdmin || hosting === "open" ? "allow" : "forbidden";
+}
+
+/** Importing a whole event (with its people) is a platform-level action. */
+export function decideImportEvent(actor: Actor | null): Decision {
   if (!actor) return "unauthenticated";
   return actor.isAdmin ? "allow" : "forbidden";
 }

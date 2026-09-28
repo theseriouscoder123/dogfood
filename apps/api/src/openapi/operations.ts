@@ -20,6 +20,7 @@ import { EXPORT_FILES } from "../routes/exports";
 import { CreateWebhookBody, DeliveriesQuery, UpdateWebhookBody } from "../routes/webhooks";
 import { RevokeRecordBody } from "../routes/records";
 import { ImportQuery } from "../routes/eventImport";
+import { DiscoverQuery } from "../routes/discover";
 import { EventFile } from "../portability/format";
 
 export type Method = "get" | "post" | "put" | "patch" | "delete";
@@ -130,11 +131,17 @@ export const OPERATIONS: Operation[] = [
   { method: "post", path: "/api/auth/tokens", tag: "API tokens", summary: "Create an API token", description: "The response carries the token once, in `secret`. Only its hash is stored.", access: "signed_in", browserOnly: true, body: CreateTokenBody, status: 201, response: S.TokenCreated },
   { method: "delete", path: "/api/auth/tokens/:tokenId", tag: "API tokens", summary: "Revoke an API token (immediate, permanent)", access: "signed_in", browserOnly: true, status: 204 },
 
+  // ── you ──
+  { method: "get", path: "/api/me/dashboard", tag: "Auth", summary: "Your dashboard: every event you're part of, with what matters for each of your roles", access: "signed_in" },
+  { method: "get", path: "/api/projects", tag: "Projects", summary: "Search submitted projects across every public event", access: "public", query: DiscoverQuery },
+
   // ── events ──
   { method: "get", path: "/api/events", tag: "Events", summary: "List events", access: "public", response: S.EventList },
   { method: "get", path: E, tag: "Events", summary: "Event detail: dates, windows, tracks, prizes, rubric, questions, your roles", access: "public", response: S.EventDetail },
-  { method: "post", path: "/api/events", tag: "Event setup", summary: "Create an event", access: "admin", body: CreateEvent, status: 201 },
+  { method: "post", path: "/api/events", tag: "Event setup", summary: "Host a hackathon: creates a draft event with you as its organizer", description: "Open to any signed-in user unless the platform sets HOSTING=admins. The event stays invisible to others until published.", access: "signed_in", body: CreateEvent, status: 201 },
   { method: "patch", path: E, tag: "Event setup", summary: "Update an event's details and dates", description: "Date changes are checked together: registration ≤ submissions open < close ≤ judging.", access: "organizer", body: UpdateEventBody },
+  { method: "post", path: `${E}/publish`, tag: "Event setup", summary: "Publish a draft event: it becomes visible and open for registration", access: "organizer" },
+  { method: "post", path: `${E}/unpublish`, tag: "Event setup", summary: "Back to draft (only while nobody has joined)", access: "organizer" },
   { method: "post", path: `${E}/register`, tag: "Teams", summary: "Register as a participant", access: "participant" },
   { method: "post", path: `${E}/tracks`, tag: "Event setup", summary: "Add a track", access: "organizer", body: TrackBody, status: 201 },
   { method: "patch", path: `${E}/tracks/:trackId`, tag: "Event setup", summary: "Edit a track", access: "organizer", body: TrackBody.partial() },

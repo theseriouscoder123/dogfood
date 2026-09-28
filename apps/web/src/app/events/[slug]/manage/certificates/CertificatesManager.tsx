@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useDialog } from "@/components/feedback";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Award, Ban, FileText, Gavel, Lock, PenLine, ShieldCheck } from "lucide-react";
@@ -13,6 +14,7 @@ import { Button, Card, EmptyState, ErrorText, Pill, SuccessText } from "@/compon
 const STATUS_TONE = { current: "success", superseded: "neutral", revoked: "danger" } as const;
 
 export function CertificatesManager({ slug, data }: { slug: string; data: RecordsAdmin }) {
+  const ask = useDialog();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -35,7 +37,7 @@ export function CertificatesManager({ slug, data }: { slug: string; data: Record
   }
 
   async function revoke(r: RecordSummary) {
-    const reason = prompt(`Revoke ${r.subject.name}'s record? Anyone checking it will see it's revoked, with your reason. This can't be undone.\n\nReason:`);
+    const reason = await ask.prompt({ title: `Revoke ${r.subject.name}'s record?`, body: "Anyone checking it will see it's revoked, and why. This is permanent.", label: "Reason", minLength: 5, confirmLabel: "Revoke", danger: true });
     if (!reason) return;
     const res = await send("POST", `/api/events/${slug}/records/${r.id}/revoke`, { reason });
     setNotice(res.ok ? { ok: true, text: `Revoked ${r.subject.name}'s record.` } : { ok: false, text: res.message });

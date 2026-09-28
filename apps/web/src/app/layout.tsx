@@ -8,6 +8,8 @@ import { ThemeToggle, themeBootScript } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { LogoMark } from "@/components/visuals";
 import { buttonClass } from "@/components/ui";
+import { FeedbackProvider } from "@/components/feedback";
+import { DesktopNav, MobileNav, type NavLink } from "@/components/SiteNav";
 
 export const metadata: Metadata = {
   title: { default: "Dogfood · Hackathons, judged fairly", template: "%s · Dogfood" },
@@ -25,69 +27,82 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     myEvents.set(r.event.slug, e);
   }
 
+  const links: NavLink[] = [
+    ...(me.user ? [{ href: "/dashboard", label: "Dashboard", icon: "dashboard" as const }] : []),
+    { href: "/hackathons", label: "Hackathons", icon: "hackathons" },
+    { href: "/projects", label: "Projects", icon: "projects" },
+    { href: me.user ? "/events/new" : "/login?next=/events/new", label: "Host a hackathon", icon: "host" },
+    { href: "/developers", label: "Developers", icon: "developers" },
+  ];
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body className="flex min-h-dvh flex-col">
-        <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur-md supports-[backdrop-filter]:bg-surface/70">
-          <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
-            <Link href="/" className="flex items-center gap-2.5">
-              <LogoMark />
-              <span className="font-display text-[19px] font-extrabold tracking-tight">Dogfood</span>
-            </Link>
-            <nav className="hidden items-center gap-1 text-sm font-semibold md:flex">
-              <Link href="/#hackathons" className="rounded-lg px-3 py-2 text-ink-2 hover:bg-surface-2 hover:text-ink">
-                Hackathons
+        <FeedbackProvider>
+          <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur-md supports-[backdrop-filter]:bg-surface/70">
+            <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:gap-6">
+              <Link href={me.user ? "/dashboard" : "/"} className="flex shrink-0 items-center gap-2.5">
+                <LogoMark />
+                <span className="font-display text-[19px] font-extrabold tracking-tight">Dogfood</span>
               </Link>
-              {me.user?.isAdmin && (
-                <Link href="/events/new" className="rounded-lg px-3 py-2 text-ink-2 hover:bg-surface-2 hover:text-ink">
-                  Host a hackathon
-                </Link>
-              )}
-            </nav>
-            <div className="ml-auto flex items-center gap-2">
-              <ThemeToggle />
-              {me.user ? (
-                <UserMenu user={me.user} events={[...myEvents.values()]} />
-              ) : (
-                <>
-                  <Link href="/login" className={buttonClass("ghost", "md")}>
-                    Log in
-                  </Link>
-                  <Link href="/register" className={buttonClass("primary", "md")}>
-                    Sign up
-                  </Link>
-                </>
-              )}
+              <DesktopNav links={links} />
+              <div className="ml-auto flex items-center gap-2">
+                <ThemeToggle />
+                {me.user ? (
+                  <UserMenu user={me.user} events={[...myEvents.values()]} />
+                ) : (
+                  <div className="hidden items-center gap-2 sm:flex">
+                    <Link href="/login" className={buttonClass("ghost", "md")}>
+                      Log in
+                    </Link>
+                    <Link href="/register" className={buttonClass("primary", "md")}>
+                      Sign up
+                    </Link>
+                  </div>
+                )}
+                <MobileNav links={links} signedIn={!!me.user} />
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <main className="flex-1">{children}</main>
+          <main className="flex-1">{children}</main>
 
-        <footer className="mt-20 border-t border-line bg-surface">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div className="flex items-center gap-2.5">
-              <LogoMark size={22} />
-              <span>
-                <span className="font-semibold text-ink">Dogfood</span> · open-source hackathon platform · MIT licensed
-              </span>
+          <footer className="mt-20 border-t border-line bg-surface">
+            <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 text-sm sm:px-6 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <LogoMark size={24} />
+                  <span className="font-display text-base font-extrabold text-ink">Dogfood</span>
+                </div>
+                <p className="mt-3 max-w-xs text-muted">Run hackathons end to end: teams, submissions, judging, community voting and certificates. Open source, self-hosted.</p>
+              </div>
+              {[
+                { title: "Explore", links: [["/hackathons", "Hackathons"], ["/projects", "Projects"], ["/events/new", "Host a hackathon"]] },
+                { title: "Developers", links: [["/developers", "API reference"], ["/developers#guide-webhooks", "Webhooks"], ["/api/openapi.json", "OpenAPI spec"]] },
+                { title: "Platform", links: [["/api/health", "Status"], ["/api/records/keys", "Signing keys"], ["/account/settings", "Account"]] },
+              ].map((col) => (
+                <div key={col.title}>
+                  <p className="text-xs font-bold uppercase tracking-wider text-ink">{col.title}</p>
+                  <ul className="mt-3 space-y-2">
+                    {col.links.map(([href, label]) => (
+                      <li key={href}>
+                        <Link href={href!} className="text-muted hover:text-ink">
+                          {label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
-            <div className="flex gap-5">
-              <Link href="/#hackathons" className="hover:text-ink">
-                Hackathons
-              </Link>
-              <Link href="/developers" className="hover:text-ink">
-                API
-              </Link>
-              <a href="/api/health" className="hover:text-ink">
-                Status
-              </a>
+            <div className="border-t border-line">
+              <p className="mx-auto max-w-7xl px-4 py-4 text-xs text-muted sm:px-6">© {new Date().getUTCFullYear()} Dogfood contributors · MIT License</p>
             </div>
-          </div>
-        </footer>
+          </footer>
+        </FeedbackProvider>
       </body>
     </html>
   );

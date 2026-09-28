@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialog } from "@/components/feedback";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Crown, FileText, Link2, LogOut, Mail, Pencil, Plus, UserMinus, X } from "lucide-react";
@@ -37,6 +38,7 @@ export function CreateTeam({ slug }: { slug: string }) {
 }
 
 export function TeamPanel({ slug, data, meId, canChange, submissionsOpen }: { slug: string; data: WithTeam; meId: string; canChange: boolean; submissionsOpen: boolean }) {
+  const ask = useDialog();
   const router = useRouter();
   const { team, myRole, maxTeamSize } = data;
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export function TeamPanel({ slug, data, meId, canChange, submissionsOpen }: { sl
                 variant="ghost"
                 size="sm"
                 onClick={async () => {
-                  if (!confirm(team.members.length === 1 ? "You're the last member, so leaving deletes the team. Continue?" : "Leave this team?")) return;
+                  if (!(await ask.confirm(team.members.length === 1 ? { title: "Leave and delete the team?", body: "You're the last member.", confirmLabel: "Leave", danger: true } : { title: "Leave this team?", confirmLabel: "Leave", danger: true }))) return;
                   if ((await act("POST", `/api/events/${slug}/teams/mine/leave`)) !== null) router.push(`/events/${slug}`);
                 }}
               >

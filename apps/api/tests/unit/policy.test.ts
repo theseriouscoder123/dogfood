@@ -5,6 +5,7 @@ import {
   decideScore,
   judgingWindow,
   decideCreateEvent,
+  decideImportEvent,
   decideEditProject,
   decideParticipate,
   decideViewProject,
@@ -113,8 +114,11 @@ describe("editing and viewing projects", () => {
 describe("events and participation", () => {
   it("only admins create events", () => {
     expect(decideCreateEvent(null)).toBe("unauthenticated");
-    expect(decideCreateEvent(organizer.actor)).toBe("forbidden");
-    expect(decideCreateEvent(admin.actor)).toBe("allow");
+    expect(decideCreateEvent(organizer.actor)).toBe("allow"); // hosting is open by default
+    expect(decideCreateEvent(organizer.actor, "admins")).toBe("forbidden");
+    expect(decideCreateEvent(admin.actor, "admins")).toBe("allow");
+    expect(decideImportEvent(organizer.actor)).toBe("forbidden");
+    expect(decideImportEvent(admin.actor)).toBe("allow");
   });
 
   const event = {

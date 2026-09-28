@@ -24,6 +24,9 @@ import { metaRouter } from "./routes/meta";
 import { webhooksRouter } from "./routes/webhooks";
 import { recordsAdminRouter, recordsRouter } from "./routes/records";
 import { eventImportRouter } from "./routes/eventImport";
+import { meRouter } from "./routes/me";
+import { discoverRouter } from "./routes/discover";
+import { draftGuard } from "./lib/events";
 
 /**
  * Every router and where it is mounted, in mount order. The OpenAPI drift test walks this table,
@@ -39,6 +42,10 @@ export const MOUNTS: ReadonlyArray<readonly [string, Router]> = [
   ["/api", metaRouter],
   ["/api/auth/tokens", tokensRouter],
   ["/api/auth", authRouter],
+  ["/api/me", meRouter],
+  ["/api/projects", discoverRouter],
+  // before every event router: unpublished events are invisible to all but their organizers
+  ["/api/events/:slug", draftGuard],
   ["/api/events", eventsRouter],
   ["/api/events", eventAdminRouter],
   ["/api/events/:slug", judgingAdminRouter],

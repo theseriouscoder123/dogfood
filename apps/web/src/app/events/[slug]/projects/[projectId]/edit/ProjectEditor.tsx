@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useDialog } from "@/components/feedback";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle, Eye, Lock, Send, Undo2, X } from "lucide-react";
@@ -20,6 +21,7 @@ export function ProjectEditor({ slug, project, tracks, questions, answers, deadl
   answers: Record<string, string>;
   deadline: string;
 }) {
+  const ask = useDialog();
   const router = useRouter();
   const base = `/api/events/${slug}/projects/${project.id}`;
   const [f, setF] = useState({
@@ -242,8 +244,8 @@ export function ProjectEditor({ slug, project, tracks, questions, answers, deadl
             type="button"
             variant="danger"
             disabled={pending}
-            onClick={() => {
-              if (confirm("Withdraw this project? It leaves the event for good and can't be restored.")) {
+            onClick={async () => {
+              if (await ask.confirm({ title: "Withdraw this project?", body: "It leaves the event for good.", confirmLabel: "Withdraw", danger: true })) {
                 void run([() => send("POST", `${base}/withdraw`)], "Withdrawn.").then((ok) => ok && router.push(`/events/${slug}/team`));
               }
             }}

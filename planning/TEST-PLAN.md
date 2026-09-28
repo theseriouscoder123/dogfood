@@ -264,7 +264,7 @@ Run these with `curl` or the browser's DevTools. Swap the cookie per role.
 - Demo dates are relative to first boot, so a stack older than 2 days has stale demo states. Reset it.
 - Rank uncertainty treats projects as independent, so it's an approximation (documented in the code and the report).
 - Integrity flags are advice; they never change results on their own.
-- T3/T4 features (webhooks, certificates, embeds, bulk import) aren't built yet.
+- T3 and T4 (voting, comments, People's Choice, API tokens, webhooks, certificates, embed, import/export) are covered in `TEST-PLAN-2.md`.
 
 ---
 

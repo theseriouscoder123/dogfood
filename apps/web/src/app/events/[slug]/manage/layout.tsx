@@ -6,6 +6,7 @@ import { getMe } from "@/lib/session";
 import { EmptyState } from "@/components/ui";
 import { LogoTile } from "@/components/visuals";
 import { ManageNav } from "./ManageNav";
+import { DraftBanner } from "./DraftBanner";
 
 export const metadata = { title: "Manage event" };
 
@@ -41,7 +42,10 @@ export default async function ManageLayout({ children, params }: { children: Rea
           View public page <ArrowUpRight className="size-4" />
         </Link>
       </aside>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0">
+        {!event.publishedAt && <DraftBanner slug={slug} />}
+        {children}
+      </div>
     </div>
   );
 }
