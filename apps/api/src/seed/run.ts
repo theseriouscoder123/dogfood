@@ -9,6 +9,7 @@ import { sha256 } from "../lib/crypto";
 import { importFixtures } from "./importFixtures";
 import { seedShowcase } from "./showcase";
 import { DEMO_JUDGE_EMAIL, DEMO_VOTER_EMAIL, JUDGING_DEMO_SLUG, seedJudgingDemo } from "./judgingDemo";
+import { seedPairwiseDemo } from "./pairwiseDemo";
 import { enqueuePing } from "../webhooks/outbox";
 import { issuable, issueRecords } from "../records/issue";
 import { notify, type Note } from "../notifications/notify";
@@ -158,6 +159,7 @@ async function main() {
   if (process.env.SEED_SHOWCASE !== "false") {
     await seedShowcase(prisma, event.id, organizer.id);
     await seedJudgingDemo(prisma, organizer.id, demoHash);
+    await seedPairwiseDemo(prisma);
     // The sample event's judging is over and its results are public: sign its records and certificates.
     const sample = await prisma.event.findUniqueOrThrow({ where: { id: event.id } });
     if (issuable(sample) && (await prisma.signedRecord.count({ where: { eventId: sample.id } })) === 0) {

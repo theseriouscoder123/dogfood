@@ -111,6 +111,7 @@ model User {
   teamsCreated   Team[]                @relation("TeamCreatedBy")
   invitesCreated TeamInvite[]
   assignments    Assignment[]
+  comparisons    PairwiseComparison[]
   batchesCreated AssignmentBatch[]
   conflicts      ConflictOfInterest[]
   runsCreated    NormalizationRun[]
@@ -176,6 +177,7 @@ model Event {
   votingPublishedAt   DateTime?    @db.Timestamptz(3) // People's Choice results made public
   votingBallotsHash   String? // SHA-256 of the published ballot file, fixed at publish time
   publishedRunId      String?      @unique @db.Uuid // null = results hidden
+  pairwiseEnabled     Boolean      @default(false) // judges also compare projects head to head
   publishedAt         DateTime?    @default(now()) @db.Timestamptz(3) // null = draft: visible to its organizers only
   createdById         String?      @db.Uuid
   createdAt           DateTime     @default(now()) @db.Timestamptz(3)
@@ -193,6 +195,7 @@ model Event {
   batches       AssignmentBatch[]
   assignments   Assignment[]
   reviews       Review[]
+  comparisons   PairwiseComparison[]
   judgeTracks   JudgeTrack[]
   conflicts     ConflictOfInterest[]
   runs          NormalizationRun[]    @relation("EventRuns")
@@ -410,6 +413,8 @@ model Assignment {
   judge   User             @relation(fields: [judgeId], references: [id], onDelete: Cascade)
   project Project          @relation(fields: [projectId, eventId], references: [id, eventId], onDelete: Cascade)
   review  Review?
+  pairsAsLeft  PairwiseComparison[] @relation("PairLeft")
+  pairsAsRight PairwiseComparison[] @relation("PairRight")
 
   @@unique([judgeId, projectId])
   @@unique([id, judgeId, projectId])
@@ -987,4 +992,32 @@ model FinderPost {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+}
+
+enum PairwiseOutcome {
+  left
+  right
+  tie
+}
+
+/// One head-to-head judgement: which of two projects a judge thinks is better. Both sides must be
+/// the judge's own assignments (composite foreign keys), so a judge can only compare work they
+/// were given. One comparison per judge per pair, whichever side was shown on the left.
+model PairwiseComparison {
+  id             String          @id @default(uuid()) @db.Uuid
+  eventId        String          @db.Uuid
+  judgeId        String          @db.Uuid
+  leftProjectId  String          @db.Uuid
+  rightProjectId String          @db.Uuid
+  pairKey        String // the two project ids, sorted, joined with ":"
+  outcome        PairwiseOutcome
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+
+  event Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  judge User       @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  left  Assignment @relation("PairLeft", fields: [judgeId, leftProjectId], references: [judgeId, projectId], onDelete: Cascade)
+  right Assignment @relation("PairRight", fields: [judgeId, rightProjectId], references: [judgeId, projectId], onDelete: Cascade)
+
+  @@unique([judgeId, pairKey])
+  @@index([eventId])
 }

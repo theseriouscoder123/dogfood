@@ -219,6 +219,36 @@ const EXPORTS: ExportDef[] = [
     },
   },
   {
+    file: "comparisons.csv",
+    title: "Head-to-head comparisons",
+    stage: "Judging",
+    description: "Every pairwise judgement: who compared what, which side was shown on the left, and the verdict.",
+    async build(event) {
+      const [rows, roles] = await Promise.all([
+        prisma.pairwiseComparison.findMany({
+          where: { eventId: event.id },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true, judgeId: true, outcome: true, createdAt: true,
+            judge: { select: { name: true } },
+            left: { select: { project: { select: { id: true, externalId: true, title: true } } } },
+            right: { select: { project: { select: { id: true, externalId: true, title: true } } } },
+          },
+        }),
+        prisma.eventRole.findMany({ where: { eventId: event.id, role: "judge" }, select: { userId: true, externalId: true } }),
+      ]);
+      const judgeExt = new Map(roles.map((r) => [r.userId, r.externalId]));
+      return {
+        header: ["comparison_id", "judge_id", "judge_external_id", "judge", "left_project_id", "left_external_id", "left_project", "right_project_id", "right_external_id", "right_project", "outcome", "winner_project_id", "compared_at"],
+        rows: rows.map((c) => [
+          c.id, c.judgeId, judgeExt.get(c.judgeId), c.judge.name,
+          c.left.project.id, c.left.project.externalId, c.left.project.title, c.right.project.id, c.right.project.externalId, c.right.project.title,
+          c.outcome, c.outcome === "left" ? c.left.project.id : c.outcome === "right" ? c.right.project.id : "", c.createdAt,
+        ]),
+      };
+    },
+  },
+  {
     file: "results.csv",
     title: "Results",
     stage: "Results",

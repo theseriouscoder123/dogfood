@@ -11,7 +11,8 @@ import { EmailInviteBody, InviteBody as TeamInviteBody, TeamNameBody } from "../
 import { CreateCommentBody, CommentsSettingsBody, EditCommentBody, HideCommentBody, ModerationQuery, ReportCommentBody } from "../routes/comments";
 import { ConflictBody, CriterionBody, InviteBody as JudgeInviteBody, JudgeTracksBody, UpdateCriterionBody } from "../routes/judgingAdmin";
 import { AddAssignmentBody, CommitPlanBody, PlanParams, ReassignBody } from "../routes/assignments";
-import { ReviewBody, RecuseBody } from "../routes/judgeConsole";
+import { CompareBody, ReviewBody, RecuseBody } from "../routes/judgeConsole";
+import { PairwiseSettingsBody } from "../routes/pairwise";
 import { RedistributeBody, RemindBody } from "../routes/progress";
 import { OptionsBody } from "../routes/results";
 import { ResolveBody } from "../routes/integrity";
@@ -241,6 +242,8 @@ export const OPERATIONS: Operation[] = [
   { method: "get", path: `${E}/judging/:assignmentId`, tag: "Judge console", summary: "One assignment: the project, the rubric and your saved review", access: "judge" },
   { method: "put", path: `${E}/judging/:assignmentId/review`, tag: "Judge console", summary: "Save your review as a draft", access: "judge", body: ReviewBody },
   { method: "post", path: `${E}/judging/:assignmentId/submit`, tag: "Judge console", summary: "Submit your review (every criterion scored)", access: "judge" },
+  { method: "get", path: `${E}/judging/pairwise`, tag: "Judge console", summary: "The next pair of your own projects to compare head to head", description: "Chosen from your own rubric scores and how often each project has been compared, never from other judges' verdicts. `pair` is null when you've compared every pair or head-to-head judging is off.", access: "judge" },
+  { method: "post", path: `${E}/judging/pairwise`, tag: "Judge console", summary: "Say which of two of your projects is better", description: "Both must be your own live assignments; each pair once. 409 `pairwise_off` when the organizer hasn't turned it on.", access: "judge", body: CompareBody, status: 201 },
   { method: "post", path: `${E}/judging/:assignmentId/recuse`, tag: "Judge console", summary: "Recuse yourself, optionally declaring a conflict", access: "judge", body: RecuseBody },
   { method: "get", path: `${E}/judges/:judgeRef/scores`, tag: "Judge console", summary: "A judge's scores: your own, or any judge's for organizers", description: "Peer isolation: a judge asking for anyone but themselves gets 403, whether or not that judge exists.", access: "judge" },
 
@@ -257,6 +260,8 @@ export const OPERATIONS: Operation[] = [
   { method: "post", path: `${E}/normalization/runs/:runId/publish`, tag: "Results", summary: "Publish a run", description: "Only after judging closes, and only if the run's inputs still match the data (not stale).", access: "organizer" },
   { method: "post", path: `${E}/normalization/unpublish`, tag: "Results", summary: "Take results down", access: "organizer" },
   { method: "get", path: `${E}/normalization/report.md`, tag: "Results", summary: "This event's normalization report (method, evidence, judge effects)", access: "organizer", produces: "text/markdown" },
+  { method: "put", path: `${E}/pairwise/settings`, tag: "Results", summary: "Turn head-to-head judging on or off", access: "organizer", body: PairwiseSettingsBody },
+  { method: "get", path: `${E}/pairwise`, tag: "Results", summary: "Head-to-head ranking (Bradley–Terry) and its agreement with the rubric results", description: "Ratings on the Elo scale with standard errors and 90% rank ranges; projects the two methods place far apart; position bias; each judge's agreement with the rest of the panel (leave-one-out).", access: "organizer" },
   { method: "get", path: `${E}/results`, tag: "Results", summary: "Published results", description: "404 `results_not_published` until an organizer publishes a run.", access: "public", response: S.PublishedResults },
 
   // ── integrity ──

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, CheckCircle2, CircleDashed, Gavel, Keyboard, Lock, PenLine, UserX } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, CheckCircle2, CircleDashed, Gavel, Keyboard, Lock, PenLine, UserX } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { getMe } from "@/lib/session";
 import type { JudgeQueue } from "@/lib/types";
@@ -94,6 +94,22 @@ export default async function JudgingDashboard({ params }: { params: Promise<{ s
 
       {data.criteria.length === 0 && (
         <p className="mt-6 rounded-xl bg-warn-soft px-4 py-3 text-sm font-medium text-warn">The organizers haven&apos;t published a rubric yet. You can read projects, but scoring starts once it&apos;s ready.</p>
+      )}
+
+      {data.pairwiseEnabled && w === "open" && p.total >= 2 && (
+        <Link
+          href={`/events/${slug}/judging/compare`}
+          className="group mt-6 flex items-center gap-4 rounded-2xl border border-line bg-surface p-5 shadow-card transition hover:border-line-strong hover:shadow-lift"
+        >
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+            <ArrowLeftRight className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold group-hover:text-primary">Head to head</span>
+            <span className="block text-sm text-muted">Pick the stronger of two of your projects, a few pairs at a time.</span>
+          </span>
+          <ArrowRight className="size-5 text-muted group-hover:text-primary" />
+        </Link>
       )}
 
       {data.assignments.length === 0 ? (

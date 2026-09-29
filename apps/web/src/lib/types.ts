@@ -197,6 +197,7 @@ export type JudgeCriterion = { id: string; key: string; label: string; descripti
 export type JudgeQueue = {
   event: { slug: string; name: string; judgingOpensAt: string; judgingClosesAt: string | null };
   judgingWindow: JudgingWindow;
+  pairwiseEnabled: boolean;
   criteria: JudgeCriterion[];
   progress: { total: number; submitted: number; inProgress: number; todo: number; recused: number };
   assignments: Array<{
@@ -667,4 +668,22 @@ export type PublicProfile = {
     placement: { rank: number; of: number } | null;
   }>;
   certificates: Array<{ id: string; type: "judge_participation" | "participation"; issuedAt: string; event: { slug: string; name: string } }>;
+};
+
+export type PairCard = { id: string; title: string; tagline: string; thumbnailUrl: string | null; track: string | null; team: string };
+export type PairwiseNext = { enabled: boolean; judgingWindow: JudgingWindow; done: number; suggested: number; available: number; pair: { left: PairCard; right: PairCard } | null };
+export type PairwiseReport = {
+  enabled: boolean;
+  judgingWindow: JudgingWindow;
+  comparisons: number;
+  uncompared: number;
+  agreement: number | null;
+  disagreementThreshold: number;
+  positionBias: { decided: number; leftWins: number; leftShare: number | null; z: number; flagged: boolean };
+  projects: Array<{
+    projectId: string; title: string; externalId: string | null; thumbnailUrl: string | null; team: string; track: string | null;
+    rank: number; rankLow: number; rankHigh: number; rating: number; se: number; wins: number; losses: number; ties: number; comparisons: number;
+    rubricRank: number | null; disagreement: boolean;
+  }>;
+  judges: Array<{ judgeId: string; name: string; externalId: string | null; comparisons: number; ties: number; informative: number; agreement: number | null }>;
 };

@@ -10,6 +10,8 @@ import { accessFor, decideScore, enforce, judgingWindow } from "../policy";
 import { appendAudit, fromRequest } from "../audit";
 import { eventBySlug } from "../lib/events";
 import { HttpError, notFound, unauthenticated } from "../lib/http";
+import { compositeScore } from "../judging/composite";
+import { choosePair, pairKey, suggestedComparisons } from "../judging/pairwise";
 
 export const judgeConsoleRouter = Router({ mergeParams: true });
 
@@ -56,6 +58,7 @@ judgeConsoleRouter.get("/", async (req, res) => {
   res.json({
     event: { slug: event.slug, name: event.name, judgingOpensAt: event.judgingOpensAt ?? event.submissionsCloseAt, judgingClosesAt: event.judgingClosesAt },
     judgingWindow: judgingWindow(event),
+    pairwiseEnabled: event.pairwiseEnabled,
     criteria,
     progress: { total: assignments.length - count("recused"), submitted: count("submitted"), inProgress: count("in_progress"), todo: count("assigned"), recused: count("recused") },
     assignments: assignments.map((a) => ({
@@ -63,6 +66,79 @@ judgeConsoleRouter.get("/", async (req, res) => {
       project: { ...a.project, track: a.project.track?.name ?? null, team: a.project.team.name },
     })),
   });
+});
+
+// ── head to head ────────────────────────────────────────────────────────────
+// Judges compare two of their own assignments. The pair is chosen from the judge's own data
+// (their rubric scores) plus comparison counts, never from anyone's outcomes.
+
+const projectCard = { id: true, title: true, tagline: true, thumbnailUrl: true, track: { select: { name: true } }, team: { select: { name: true } } } as const;
+
+/** The judge's comparable projects: live assignments on judgeable projects, with their own composite if they've scored it. */
+async function comparable(eventId: string, judgeId: string) {
+  const [assignments, criteria] = await Promise.all([
+    prisma.assignment.findMany({
+      where: { eventId, judgeId, status: { not: "recused" }, project: { status: "submitted", duplicateOfId: null } },
+      select: { id: true, projectId: true, project: { select: projectCard }, review: { select: { scores: { select: { criterionId: true, value: true } } } } },
+    }),
+    criteriaOf(eventId),
+  ]);
+  return assignments.map((a) => ({
+    projectId: a.projectId,
+    project: { ...a.project, track: a.project.track?.name ?? null, team: a.project.team.name },
+    myScore: a.review ? compositeScore(new Map(a.review.scores.map((s) => [s.criterionId, s.value])), criteria) : null,
+  }));
+}
+
+/** The next pair to compare, and progress. */
+judgeConsoleRouter.get("/pairwise", async (req, res) => {
+  const { event, judgeId } = await judgeContext(req);
+  const [mine, done, counts] = await Promise.all([
+    comparable(event.id, judgeId),
+    prisma.pairwiseComparison.findMany({ where: { eventId: event.id, judgeId }, select: { pairKey: true } }),
+    prisma.$queryRaw<Array<{ projectId: string; n: bigint }>>`
+      SELECT p."projectId", count(*) AS n FROM (
+        SELECT "leftProjectId" AS "projectId" FROM "PairwiseComparison" WHERE "eventId" = ${event.id}::uuid
+        UNION ALL SELECT "rightProjectId" FROM "PairwiseComparison" WHERE "eventId" = ${event.id}::uuid
+      ) p GROUP BY p."projectId"`,
+  ]);
+  const pair = event.pairwiseEnabled ? choosePair(judgeId, mine, new Set(done.map((d) => d.pairKey)), new Map(counts.map((c) => [c.projectId, Number(c.n)]))) : null;
+  const card = (id: string) => mine.find((m) => m.projectId === id)!.project;
+  res.json({
+    enabled: event.pairwiseEnabled,
+    judgingWindow: judgingWindow(event),
+    done: done.length,
+    suggested: suggestedComparisons(mine.length),
+    available: (mine.length * (mine.length - 1)) / 2,
+    pair: pair && { left: card(pair.left), right: card(pair.right) },
+  });
+});
+
+export const CompareBody = z.object({
+  leftId: z.uuid(),
+  rightId: z.uuid(),
+  outcome: z.enum(["left", "right", "tie"]).describe("Which project is better; tie means too close to call."),
+});
+
+/** Record one comparison. Both projects must be the judge's own live assignments; each pair once. */
+judgeConsoleRouter.post("/pairwise", async (req, res) => {
+  const { event, access, judgeId } = await judgeContext(req);
+  if (!event.pairwiseEnabled) throw new HttpError(409, "pairwise_off", "Head-to-head judging isn't turned on for this event.");
+  const body = CompareBody.parse(req.body);
+  if (body.leftId === body.rightId) throw new HttpError(400, "same_project", "Pick two different projects.");
+  const mine = await comparable(event.id, judgeId);
+  const ids = new Set(mine.map((m) => m.projectId));
+  if (!ids.has(body.leftId) || !ids.has(body.rightId)) throw notFound("Assignment"); // not yours looks like not there
+  enforce(decideScore(access, judgingWindow(event), { status: "assigned" }));
+  const key = pairKey(body.leftId, body.rightId);
+  if (await prisma.pairwiseComparison.findUnique({ where: { judgeId_pairKey: { judgeId, pairKey: key } } }))
+    throw new HttpError(409, "already_compared", "You've already compared these two.");
+  const c = await prisma.$transaction(async (tx) => {
+    const c = await tx.pairwiseComparison.create({ data: { eventId: event.id, judgeId, leftProjectId: body.leftId, rightProjectId: body.rightId, pairKey: key, outcome: body.outcome } });
+    await appendAudit(tx, { ...fromRequest(req), eventId: event.id, action: "pairwise.compared", entityType: "PairwiseComparison", entityId: c.id, after: { left: body.leftId, right: body.rightId, outcome: body.outcome } });
+    return c;
+  });
+  res.status(201).json({ comparison: { id: c.id, outcome: c.outcome, createdAt: c.createdAt } });
 });
 
 /** Everything needed to score one project. Records when the judge first opened it. */

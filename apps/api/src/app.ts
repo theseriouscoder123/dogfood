@@ -16,6 +16,7 @@ import { assignmentsRouter } from "./routes/assignments";
 import { judgeConsoleRouter } from "./routes/judgeConsole";
 import { progressRouter } from "./routes/progress";
 import { resultsRouter } from "./routes/results";
+import { pairwiseRouter } from "./routes/pairwise";
 import { integrityRouter } from "./routes/integrity";
 import { votingRouter } from "./routes/voting";
 import { commentModerationRouter, commentsRouter } from "./routes/comments";
@@ -55,6 +56,7 @@ export const MOUNTS: ReadonlyArray<readonly [string, Router]> = [
   ["/api/events/:slug", assignmentsRouter],
   ["/api/events/:slug", progressRouter],
   ["/api/events/:slug", resultsRouter],
+  ["/api/events/:slug", pairwiseRouter],
   ["/api/events/:slug", integrityRouter],
   ["/api/events/:slug", votingRouter],
   ["/api/events/:slug", commentModerationRouter],

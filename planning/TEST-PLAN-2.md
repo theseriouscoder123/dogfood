@@ -256,6 +256,25 @@ Import a copy of the fixtures to get an event with a past deadline and no ballot
 
 ---
 
+## 7b. Head-to-head (pairwise) judging
+
+Event: Spring Build Sprint, which has head-to-head on and 75 seeded comparisons.
+
+- [ ] **PW-1** As the organizer, open Manage → **Head to head**. You should see:
+  - 75 comparisons, agreement about 0.9, no position bias;
+  - three rows marked **differs**;
+  - Ava Moreau at 27%, marked **against the panel** (she's the planted contrarian).
+- [ ] **PW-2** **comparisons.csv** downloads: 76 lines including the header, one `winner_project_id` per decided row. It's also listed on the Exports page.
+- [ ] **PW-3** Log in as `judge@dogfood.local` and open Judging. The **Head to head** card is shown; open it.
+  - Both projects are in your own queue.
+  - ← / ↓ / → record a choice and the next pair loads. The counter goes up.
+- [ ] **PW-4** Keep going until "You've compared every pair". The same pair is never shown twice.
+- [ ] **PW-5** In Manage → Head to head, click **Turn off**. The judge's card disappears, and the compare page says it's off. Turn it back on.
+- [ ] **PW-6** Probe the API as `seed-judge-b`: `POST /api/events/spring-build-sprint/judging/pairwise` with two projects that aren't theirs should return **404**. `GET /api/events/spring-build-sprint/pairwise` should return **403**, because judges never see the panel's view.
+- [ ] **PW-7** As the organizer, `POST …/judging/pairwise` should return **403**, because organizers can't compare on a judge's behalf.
+
+---
+
 ## 8. Known limits (not bugs)
 
 - T3 and T4 have no checks in the official `run.py`; the checker verifies T1 and T2 only.
