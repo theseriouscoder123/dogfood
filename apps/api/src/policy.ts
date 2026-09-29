@@ -57,8 +57,10 @@ export function decideWriteSubmission(a: EventAccess, window: SubmissionWindow):
 /** Editing or submitting an existing project: team members only, and only while submissions are open. */
 export function decideEditProject(a: EventAccess, window: SubmissionWindow, isTeamMember: boolean): Outcome {
   if (!a.actor) return "unauthenticated";
-  if (window !== "open") return window;
-  return isTeamMember ? "allow" : "forbidden";
+  // Someone else's project is refused as such, deadline or not: a stranger's attempt isn't the
+  // team gaming the deadline, and shouldn't be logged as if it were.
+  if (!isTeamMember) return "forbidden";
+  return window !== "open" ? window : "allow";
 }
 
 /**

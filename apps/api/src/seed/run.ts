@@ -132,6 +132,7 @@ async function seedDemoNotifications(sampleEventId: string) {
 }
 
 async function main() {
+  const seedStartedAt = new Date();
   const fixture = JSON.parse(await readFile(config.fixturesPath, "utf8"));
   const demoHash = config.seedDemo ? await hashPassword(DEMO_PASSWORD) : null;
   const adminHash = process.env.ADMIN_PASSWORD ? await hashPassword(process.env.ADMIN_PASSWORD) : demoHash;
@@ -206,6 +207,10 @@ async function main() {
   await seedDemoNotifications(event.id);
   await seedDemoProfiles();
   await seedDemoCommunity(organizer.id, event.id);
+  // Seeding replays history (results published, certificates issued) through the audit log, which
+  // queues notification emails. Those people never asked for mail from a demo install: keep the
+  // in-portal notifications, skip the emails.
+  await prisma.notification.updateMany({ where: { createdAt: { gte: seedStartedAt }, emailWanted: true, emailedAt: null }, data: { emailWanted: false } });
   lines.push(`  ${"api token".padEnd(12)} Authorization: Bearer ${DEMO_API_TOKEN}   organizer, read-only`);
   console.log(["", "seeded. test logins:", ...lines, `  password for every seeded account: ${DEMO_PASSWORD}`, ""].join("\n"));
 }

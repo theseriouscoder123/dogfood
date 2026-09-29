@@ -234,3 +234,22 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - **Autosave:** the half-filled wizard is kept in localStorage.
 - `EventForm` is now schedule-only (organizer console).
 - **Verified:** one event created in the browser end to end, with its track, prize and 4-criterion rubric present, checked through the API.
+
+## Hardening: offline fresh clone and the access matrix (Sep 28)
+
+**Fresh clone, network off.**
+- Cloned the repo into an empty folder and ran it under its own compose project (fresh volumes). An override put db, mail, api, hooks and web on an `internal: true` network with no route out; only the gateway was on both networks.
+- Results:
+  - boots in about 25s; the API really has no egress (`EAI_AGAIN`);
+  - checker 7/7; every page returns 200; no external asset URLs in the HTML;
+  - mail and the demo webhook receiver work inside the network; audit chain intact;
+  - restarting the API (the seed runs on every start) changes no row counts.
+- **Found:** the first boot sent 200 emails. The seed replays history (results published, certificates issued) through the audit log, and each of those queued a notification email.
+- **Fix:** the seed now marks the notifications it created as not-to-email. They still appear in the portal. After the fix, a fresh boot sends only the 3 live organizer alerts.
+
+**Access matrix** (`tests/integration/access-matrix.test.ts`).
+- Built from the OpenAPI catalogue's `access` field. Every documented route is called as each persona its level excludes: anonymous, a stranger, a participant, another team's member, the judge, a peer judge, the organizer, another event's organizer, an admin, and a read-only token.
+- Expected: 401 for anonymous callers, 403/404 for signed-in ones. That comes to more than 600 calls, and the audit log must not grow.
+- **Found:** editing, submitting, unsubmitting or withdrawing someone else's project after the deadline returned "closed", and was audited as `submission.refused_closed` against that project. Nothing leaked, but the reason was wrong and the forensic record misattributed it.
+- **Fix:** `decideEditProject` checks team membership before the deadline. Creating a project (the T1 checker path) still checks the deadline first.
+- Tests: 401 unit, 179 integration.

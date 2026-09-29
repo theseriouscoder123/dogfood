@@ -90,6 +90,7 @@ describe("editing and viewing projects", () => {
     ["team member, closed", participant, "closed", true, "closed"],
     ["participant on another team", participant, "open", false, "forbidden"],
     ["organizer who is not on the team", organizer, "open", false, "forbidden"],
+    ["participant on another team, after the deadline (not their project, not a late edit)", participant, "closed", false, "forbidden"],
   ] as const)("edit: %s → %s", (_label, a, window, member, expected) => {
     expect(decideEditProject(a, window, member)).toBe(expected);
   });
