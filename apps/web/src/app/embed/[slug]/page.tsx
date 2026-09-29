@@ -30,8 +30,8 @@ export default async function EmbedPage({ params, searchParams }: { params: Prom
 
   return (
     <>
-      {/* No site chrome inside someone else's page; the theme comes from the embed, not the visitor's portal setting. */}
-      <style>{`body > header, body > footer { display: none !important } body { min-height: 0 !important; background: var(--bg) } main { padding: 0 !important }`}</style>
+      {/* The root layout renders embeds bare (see middleware.ts); the theme comes from the embed, not the visitor's portal setting. */}
+      <style>{`body { background: var(--bg) }`}</style>
       {theme && <script dangerouslySetInnerHTML={{ __html: `document.documentElement.dataset.theme=${JSON.stringify(theme)}` }} />}
       <EmbedGallery
         slug={slug}

@@ -39,7 +39,7 @@ export function UserMenu({ user, events }: Props) {
         className="flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-2.5 transition hover:border-line-strong"
       >
         <Avatar name={user.name} src={user.avatarUrl} size={28} className="ring-0" />
-        <span className="hidden max-w-32 truncate text-sm font-semibold sm:block">{user.name.split(" ")[0]}</span>
+        <span className="hidden max-w-32 truncate text-sm font-semibold sm:block lg:hidden xl:block">{user.name.split(" ")[0]}</span>
         <ChevronDown className="size-4 text-muted" />
       </button>
       {open && (

@@ -19,6 +19,10 @@ export const CATEGORY_ICON: Record<string, typeof Bell> = {
   reminders: Timer,
 };
 
+/** Fired after notifications are marked read elsewhere, so the header bell updates at once. */
+export const NOTIFICATIONS_CHANGED = "dogfood:notifications-changed";
+export const notificationsChanged = () => window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED));
+
 export function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (s < 60) return "just now";
@@ -46,12 +50,15 @@ export function NotificationBell() {
   useEffect(() => {
     void load();
     const t = setInterval(() => document.visibilityState === "visible" && void load(), 30_000);
+    const refresh = () => void load();
+    window.addEventListener(NOTIFICATIONS_CHANGED, refresh);
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", esc);
     return () => {
       clearInterval(t);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, refresh);
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", esc);
     };

@@ -5,9 +5,11 @@ import { hashPassword, verifyPassword } from "../auth/password";
 import { clearSessionCookie, createSession, setSessionCookie, tokenFrom } from "../auth/session";
 import { audit, fromRequest } from "../audit";
 import { HttpError } from "../lib/http";
+import { FixedWindowLimiter } from "../lib/rateLimit";
 import { randomToken, sha256 } from "../lib/crypto";
 import { absoluteUrl, sendMail } from "../lib/mail";
 import { isDisposableEmail } from "../voting/disposable";
+import { ensureHandle } from "../users/profile";
 
 export const authRouter = Router();
 
@@ -25,30 +27,51 @@ authRouter.post("/register", async (req, res) => {
   const body = RegisterBody.parse(req.body);
   const existing = await prisma.user.findUnique({ where: { email: body.email } });
   if (existing?.passwordHash) throw new HttpError(409, "email_taken", "An account with this email already exists.");
+  // Invited or imported people exist without a password. Knowing their address isn't enough to
+  // take the account: the owner gets a one-time link to set a password, and nobody is signed in here.
+  if (existing) {
+    await emailPasswordLink(existing, req);
+    res.status(202).json({ pending: true, message: "This email already has an account, probably from an invitation. We've emailed a link to set your password." });
+    return;
+  }
 
-  // Imported people (judges, fixture team members) exist without a password; registering claims the account.
   const passwordHash = await hashPassword(body.password);
-  const user = existing
-    ? await prisma.user.update({ where: { id: existing.id }, data: { passwordHash, name: body.name } })
-    : await prisma.user.create({ data: { email: body.email, name: body.name, passwordHash } });
+  const user = await prisma.user.create({ data: { email: body.email, name: body.name, passwordHash } });
+  await ensureHandle(user);
 
   const { token, expiresAt } = await createSession(user.id);
   setSessionCookie(res, token, expiresAt);
   await audit({
     ...fromRequest(req),
     actor: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
-    action: existing ? "user.claim" : "user.register",
+    action: "user.register",
     entityType: "User",
     entityId: user.id,
   });
   res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin } });
 });
 
+// Failed sign-ins, counted per account and per network, so a password can't be guessed by brute
+// force. In memory (one API process); a restart forgets them, which only ever helps the user.
+export const LOGIN_FAILURES_PER_EMAIL = 10;
+export const LOGIN_FAILURES_PER_IP = 50;
+const LOGIN_WINDOW_MS = 15 * 60_000;
+const failuresByEmail = new FixedWindowLimiter(LOGIN_FAILURES_PER_EMAIL, LOGIN_WINDOW_MS);
+const failuresByIp = new FixedWindowLimiter(LOGIN_FAILURES_PER_IP, LOGIN_WINDOW_MS);
+
 authRouter.post("/login", async (req, res) => {
   const body = LoginBody.parse(req.body);
+  const ipKey = req.ip ?? "unknown";
+  const blocked = failuresByEmail.exhausted(body.email) ?? failuresByIp.exhausted(ipKey);
+  if (blocked) {
+    res.setHeader("Retry-After", String(blocked.resetSeconds));
+    throw new HttpError(429, "too_many_attempts", `Too many failed sign-ins. Try again in ${Math.ceil(blocked.resetSeconds / 60)} minutes, or reset your password.`);
+  }
   const user = await prisma.user.findUnique({ where: { email: body.email } });
   // Same error whether the email exists or not, so logins can't be used to enumerate accounts.
   if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
+    failuresByEmail.hit(body.email);
+    failuresByIp.hit(ipKey);
     throw new HttpError(401, "invalid_credentials", "Email or password is incorrect.");
   }
   const { token, expiresAt } = await createSession(user.id);
@@ -86,7 +109,13 @@ export const ForgotBody = z.object({ email });
 authRouter.post("/forgot", async (req, res) => {
   const body = ForgotBody.parse(req.body);
   const user = await prisma.user.findUnique({ where: { email: body.email } });
-  if (user) {
+  if (user) await emailPasswordLink(user, req);
+  res.json({ ok: true });
+});
+
+/** A one-time link to (re)set the password, at most five an hour per account. */
+async function emailPasswordLink(user: { id: string; email: string; name: string; passwordHash: string | null }, req: import("express").Request) {
+  {
     const recent = await prisma.passwordReset.count({ where: { userId: user.id, createdAt: { gt: new Date(Date.now() - RESET_TTL_MS) } } });
     if (recent < 5) {
       const token = randomToken();
@@ -106,8 +135,7 @@ authRouter.post("/forgot", async (req, res) => {
       await audit({ ...fromRequest(req), actorLabel: "anonymous", action: "auth.reset_requested", entityType: "User", entityId: user.id });
     }
   }
-  res.json({ ok: true });
-});
+}
 
 export const ResetBody = z.object({ token: z.string().min(10).max(200), password: z.string().min(8).max(200) });
 

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { BellOff, CheckCheck, Settings } from "lucide-react";
 import { send } from "@/lib/client";
 import { Button, Card } from "@/components/ui";
-import { NotificationRow, type Notification } from "@/components/NotificationBell";
+import { NotificationRow, notificationsChanged, type Notification } from "@/components/NotificationBell";
 
 export function NotificationCentre() {
   const router = useRouter();
@@ -34,6 +34,7 @@ export function NotificationCentre() {
 
   async function readAll() {
     await send("POST", "/api/me/notifications/read", { all: true });
+    notificationsChanged();
     void load();
   }
 
@@ -79,7 +80,7 @@ export function NotificationCentre() {
                 key={n.id}
                 n={n}
                 onOpen={() => {
-                  if (!n.readAt) void send("POST", "/api/me/notifications/read", { ids: [n.id] });
+                  if (!n.readAt) void send("POST", "/api/me/notifications/read", { ids: [n.id] }).then(notificationsChanged);
                   router.push(n.url || "/notifications");
                 }}
               />

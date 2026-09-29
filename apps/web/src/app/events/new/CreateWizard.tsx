@@ -222,7 +222,7 @@ export function CreateWizard() {
   return (
     <div>
       {/* stepper */}
-      <ol className="mb-8 flex items-center gap-2 overflow-x-auto pb-1">
+      <ol className="mb-8 flex flex-wrap items-center gap-2">
         {STEPS.map((label, i) => (
           <li key={label} className="flex shrink-0 items-center gap-2">
             <button

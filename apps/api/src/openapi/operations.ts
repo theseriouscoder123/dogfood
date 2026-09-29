@@ -124,7 +124,7 @@ export const OPERATIONS: Operation[] = [
   { method: "get", path: "/api/openapi.json", tag: "Meta", summary: "This OpenAPI 3.1 document", access: "public" },
 
   // ── auth ──
-  { method: "post", path: "/api/auth/register", tag: "Auth", summary: "Create an account (or claim an imported one) and start a session", access: "public", body: RegisterBody, status: 201 },
+  { method: "post", path: "/api/auth/register", tag: "Auth", summary: "Create an account and start a session", description: "409 `email_taken` if the email already has an account. If it belongs to someone invited or imported who has no password yet, answers 202 `{ pending: true }` and emails them a one-time link to set one: registering never signs you in to an account you haven't proved is yours.", access: "public", body: RegisterBody, status: 201 },
   { method: "post", path: "/api/auth/login", tag: "Auth", summary: "Sign in with email and password; sets the session cookie", access: "public", body: LoginBody },
   { method: "post", path: "/api/auth/logout", tag: "Auth", summary: "End the current session", access: "public", status: 204 },
   { method: "get", path: "/api/auth/me", tag: "Auth", summary: "The caller and their roles in each event", description: "Returns `user: null` for visitors. Handy for checking which account an API token belongs to.", access: "public", response: S.Me },

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, Award, Download, FileText, Gavel, History, Medal } from "lucide-react";
+import { AlertTriangle, Award, CheckCircle2, Download, FileText, Gavel, History, Medal } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { PublicRecord, RecordStatement } from "@/lib/types";
 import { formatDate } from "@/lib/format";
@@ -8,6 +8,7 @@ import { attestation, ordinal, recordTitle } from "@/lib/records";
 import { Card, Pill } from "@/components/ui";
 import { LogoTile } from "@/components/visuals";
 import { BrowserCheck } from "./BrowserCheck";
+import { ShareLink } from "./ShareLink";
 
 export const metadata = { title: "Verify a record" };
 
@@ -91,19 +92,6 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
               </a>
             </Fact>
           )}
-          {judge && (
-            <Fact label="Reviews commitment">
-              <code className="break-all font-mono text-xs">{s.claims.reviewsDigest}</code>
-              <span className="mt-0.5 block text-xs text-muted">A SHA-256 over this judge&apos;s exact reviews and scores. It proves which reviews the record covers without revealing them.</span>
-            </Fact>
-          )}
-          <Fact label="Signing key">
-            <code className="font-mono text-xs">Ed25519 · {r.key.kid}</code>
-            {r.key.retiredAt && <span className="ml-1 text-xs text-muted">(retired {formatDate(r.key.retiredAt)}; still valid for records it signed)</span>}
-          </Fact>
-          <Fact label="Record id">
-            <code className="break-all font-mono text-xs">{s.id}</code>
-          </Fact>
         </dl>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -113,42 +101,70 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
           <a href={`/api/records/${s.id}/signed.json`} download className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-line bg-surface px-4 text-sm font-semibold hover:border-line-strong hover:bg-surface-2">
             <Download className="size-4" /> Signed record (.json)
           </a>
+          <ShareLink />
         </div>
       </Card>
 
-      <Card title="Check it yourself" description="With nothing but the public key.">
-        <ol className="space-y-4 text-sm">
-          <li>
-            <p className="font-semibold">With the verifier in the Dogfood repository (Node 18+, no packages)</p>
-            <pre className="mt-1 overflow-x-auto rounded-lg bg-ink px-3 py-2.5 font-mono text-xs text-bg">{`node tools/verify-record.mjs ${s.verify}`}</pre>
-          </li>
-          <li>
-            <p className="font-semibold">With OpenSSL 3</p>
-            <pre className="mt-1 overflow-x-auto rounded-lg bg-ink px-3 py-2.5 font-mono text-xs text-bg">{`node tools/verify-record.mjs ${s.verify} --openssl out
+      {r.signatureValid && (
+        <Card title="How do we know this is real?">
+          <ul className="space-y-4">
+            <Reason title={`Issued by ${s.issuer.name}, the platform that ran ${s.event.name}`}>
+              It was created on {formatDate(s.issuedAt).replace(/,.*$/, "")} straight from the event&apos;s own records ({judge ? "the reviews this judge submitted" : "the team, the project and the published results"}), not typed in by hand.
+            </Reason>
+            <Reason title="Sealed so it can't be edited">
+              Every record carries a digital seal. If anyone changed a single detail, such as the name, the project or the placement, the seal would no longer match and this page would say so in red.
+            </Reason>
+            <Reason title="Checked just now, on your device">
+              Your own browser re-checked the seal when this page opened, using the portal&apos;s published key. You don&apos;t have to take our server&apos;s word for it.
+            </Reason>
+          </ul>
+          <p className="mt-5 rounded-xl bg-surface-2 px-4 py-3 text-sm text-ink-2">
+            Got this link from someone? This page is the proof. Check that the address starts with this portal&apos;s own domain, then read the name and details above.
+          </p>
+
+          <details className="mt-5 rounded-xl border border-line">
+            <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold">For developers: verify it independently</summary>
+            <div className="space-y-4 border-t border-line p-4 text-sm">
+              <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                <Fact label="Signing key">
+                  <code className="font-mono text-xs">Ed25519 · {r.key.kid}</code>
+                  {r.key.retiredAt && <span className="ml-1 text-xs text-muted">(retired {formatDate(r.key.retiredAt)}; still valid for records it signed)</span>}
+                </Fact>
+                <Fact label="Record id">
+                  <code className="break-all font-mono text-xs">{s.id}</code>
+                </Fact>
+                {judge && (
+                  <Fact label="Reviews commitment">
+                    <code className="break-all font-mono text-xs">{s.claims.reviewsDigest}</code>
+                    <span className="mt-0.5 block text-xs text-muted">A SHA-256 over this judge&apos;s exact reviews and scores. It proves which reviews the record covers without revealing them.</span>
+                  </Fact>
+                )}
+              </dl>
+              <div>
+                <p className="font-semibold">With the verifier in the Dogfood repository (Node 18+, no packages)</p>
+                <pre className="mt-1 overflow-x-auto rounded-lg bg-ink px-3 py-2.5 font-mono text-xs text-bg">{`node tools/verify-record.mjs ${s.verify}`}</pre>
+              </div>
+              <div>
+                <p className="font-semibold">With OpenSSL 3</p>
+                <pre className="mt-1 overflow-x-auto rounded-lg bg-ink px-3 py-2.5 font-mono text-xs text-bg">{`node tools/verify-record.mjs ${s.verify} --openssl out
 openssl pkeyutl -verify -pubin -inkey out/key.pem -rawin -in out/statement.txt -sigfile out/signature.bin`}</pre>
-          </li>
-          <li>
-            <p className="font-semibold">By hand</p>
-            <p className="text-ink-2">
-              The signature is Ed25519 over the UTF-8 bytes of the statement as canonical JSON (keys sorted, no spaces). The public keys are at{" "}
-              <a href="/api/records/keys" className="font-mono text-xs text-primary hover:underline">
-                /api/records/keys
-              </a>
-              .
-            </p>
-          </li>
-        </ol>
-        <details className="mt-5 rounded-xl border border-line">
-          <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold">The exact signed text and signature</summary>
-          <div className="space-y-3 border-t border-line p-4">
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-2 p-3 font-mono text-xs">{r.signedText}</pre>
-            <p className="break-all font-mono text-xs">
-              <b className="font-sans">signature</b> {r.signature}
-            </p>
-            <pre className="overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-xs">{r.key.publicKeyPem}</pre>
-          </div>
-        </details>
-      </Card>
+              </div>
+              <p className="text-ink-2">
+                By hand: the signature is Ed25519 over the UTF-8 bytes of the statement as canonical JSON (keys sorted, no spaces). The public keys are at{" "}
+                <a href="/api/records/keys" className="font-mono text-xs text-primary hover:underline">
+                  /api/records/keys
+                </a>
+                .
+              </p>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-2 p-3 font-mono text-xs">{r.signedText}</pre>
+              <p className="break-all font-mono text-xs">
+                <b className="font-sans">signature</b> {r.signature}
+              </p>
+              <pre className="overflow-x-auto rounded-lg bg-surface-2 p-3 font-mono text-xs">{r.key.publicKeyPem}</pre>
+            </div>
+          </details>
+        </Card>
+      )}
     </div>
   );
 }
@@ -159,5 +175,17 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
       <dt className="text-xs font-bold uppercase tracking-wider text-muted">{label}</dt>
       <dd className="mt-0.5">{children}</dd>
     </div>
+  );
+}
+
+function Reason({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />
+      <div>
+        <p className="font-semibold">{title}</p>
+        <p className="mt-0.5 text-sm text-ink-2">{children}</p>
+      </div>
+    </li>
   );
 }

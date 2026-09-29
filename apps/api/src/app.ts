@@ -1,3 +1,4 @@
+import { config } from "./config";
 import express, { type Router } from "express";
 import cookieParser from "cookie-parser";
 import { randomUUID } from "node:crypto";
@@ -77,7 +78,8 @@ export const MOUNTS: ReadonlyArray<readonly [string, Router]> = [
 
 export function createApp() {
   const app = express();
-  app.set("trust proxy", true); // behind the nginx gateway
+  // Only the gateway's X-Forwarded-For entry is believed; anything the client sent before it is ignored.
+  app.set("trust proxy", config.trustProxy);
   app.disable("x-powered-by");
 
   app.use((req, res, next) => {

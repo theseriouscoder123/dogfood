@@ -47,6 +47,19 @@ describe("API tokens", () => {
 });
 
 describe("FixedWindowLimiter", () => {
+  it("reports an exhausted window without counting another hit", () => {
+    let t = 0;
+    const l = new FixedWindowLimiter(2, 60_000, () => t);
+    expect(l.exhausted("a")).toBeNull();
+    l.hit("a");
+    expect(l.exhausted("a")).toBeNull();
+    l.hit("a");
+    expect(l.exhausted("a")).toMatchObject({ allowed: false, remaining: 0, resetSeconds: 60 });
+    expect(l.exhausted("a")).toMatchObject({ allowed: false }); // looking doesn't count
+    t = 60_000;
+    expect(l.exhausted("a")).toBeNull();
+  });
+
   it("allows up to the limit per window, then refuses until the window resets", () => {
     let t = 0;
     const l = new FixedWindowLimiter(3, 60_000, () => t);

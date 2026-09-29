@@ -29,6 +29,14 @@ export class FixedWindowLimiter {
     };
   }
 
+  /** Has this key used up its window, without counting another hit? */
+  exhausted(key: string): LimitResult | null {
+    const t = this.now();
+    const w = this.windows.get(key);
+    if (!w || t - w.start >= this.windowMs || w.count < this.limit) return null;
+    return { allowed: false, limit: this.limit, remaining: 0, resetSeconds: Math.max(1, Math.ceil((w.start + this.windowMs - t) / 1000)) };
+  }
+
   private sweep(t: number) {
     for (const [k, w] of this.windows) if (t - w.start >= this.windowMs) this.windows.delete(k);
   }

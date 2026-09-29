@@ -19,6 +19,12 @@ export const config = {
   mailFrom: process.env.MAIL_FROM ?? "Dogfood <no-reply@dogfood.local>",
   uploadDir: process.env.UPLOAD_DIR ?? path.resolve(process.cwd(), "uploads"),
   uploadMaxBytes: Number(process.env.UPLOAD_MAX_BYTES ?? 5 * 1024 * 1024),
+  /**
+   * How many proxies sit in front of the API and may set X-Forwarded-For. The shipped setup has
+   * one (the nginx gateway). Add one for each extra proxy you put in front (a TLS terminator, a
+   * load balancer); too high, and clients can forge the address that vote and sign-in limits use.
+   */
+  trustProxy: Number(process.env.TRUST_PROXY ?? 1),
   /** Requests per minute allowed for each API token. */
   apiTokenRateLimit: Number(process.env.API_TOKEN_RATE_LIMIT ?? 600),
   /** Hosts that webhooks may reach even though they're on a private network (e.g. "hooks,crm.internal"). */

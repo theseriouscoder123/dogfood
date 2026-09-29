@@ -120,7 +120,7 @@ export function PairwiseBoard({ slug, data }: { slug: string; data: PairwiseRepo
                 </thead>
                 <tbody>
                   {data.judges.map((j) => {
-                    const odd = j.agreement !== null && j.informative >= 5 && j.agreement < 0.5;
+                    const odd = j.againstPanel;
                     return (
                       <tr key={j.judgeId} className="border-b border-line last:border-0">
                         <td className="px-5 py-3 font-semibold">

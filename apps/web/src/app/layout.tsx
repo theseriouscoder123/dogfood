@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import "@fontsource-variable/plus-jakarta-sans";
 import "@fontsource-variable/bricolage-grotesque";
@@ -11,6 +12,8 @@ import { buttonClass } from "@/components/ui";
 import { FeedbackProvider } from "@/components/feedback";
 import { DesktopNav, MobileNav, type NavLink } from "@/components/SiteNav";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ViewSwitcher } from "@/components/ViewSwitcher";
+import { currentView, viewsFor } from "@/lib/view";
 
 export const metadata: Metadata = {
   title: { default: "Dogfood · Hackathons, judged fairly", template: "%s · Dogfood" },
@@ -20,6 +23,19 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The embeddable gallery lives inside other people's pages: no chrome, and no session lookup.
+  if ((await headers()).get("x-dogfood-embed") === "1") {
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        </head>
+        <body>
+          <main>{children}</main>
+        </body>
+      </html>
+    );
+  }
   const me = await getMe();
   const myEvents = new Map<string, { slug: string; name: string; roles: string[] }>();
   for (const r of me.roles) {
@@ -28,11 +44,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     myEvents.set(r.event.slug, e);
   }
 
+  const views = viewsFor(me);
+  const view = await currentView(me);
+  const eventRoles = Object.fromEntries([...myEvents.values()].map((e) => [e.slug, e.roles]));
+  const switcher = (variant: "menu" | "list") =>
+    me.user && <ViewSwitcher views={views} current={view} eventRoles={eventRoles} isAdmin={me.user.isAdmin} variant={variant} />;
+
+  // Each view keeps the header to what that role needs.
   const links: NavLink[] = [
     ...(me.user ? [{ href: "/dashboard", label: "Dashboard", icon: "dashboard" as const }] : []),
     { href: "/hackathons", label: "Hackathons", icon: "hackathons" },
-    { href: "/projects", label: "Projects", icon: "projects" },
-    { href: me.user ? "/events/new" : "/login?next=/events/new", label: "Host a hackathon", icon: "host" },
+    ...(view !== "organizer" ? [{ href: "/projects", label: "Projects", icon: "projects" as const }] : []),
+    ...(view !== "judge" ? [{ href: me.user ? "/events/new" : "/login?next=/events/new", label: "Host a hackathon", icon: "host" as const }] : []),
     { href: "/developers", label: "Developers", icon: "developers" },
   ];
 
@@ -44,13 +67,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="flex min-h-dvh flex-col">
         <FeedbackProvider>
           <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur-md supports-[backdrop-filter]:bg-surface/70">
-            <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:gap-6">
+            <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 xl:gap-6">
               <Link href={me.user ? "/dashboard" : "/"} className="flex shrink-0 items-center gap-2.5">
                 <LogoMark />
                 <span className="font-display text-[19px] font-extrabold tracking-tight">Dogfood</span>
               </Link>
               <DesktopNav links={links} />
               <div className="ml-auto flex items-center gap-2">
+                {switcher("menu")}
                 <ThemeToggle />
                 {me.user && <NotificationBell />}
                 {me.user ? (
@@ -65,7 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     </Link>
                   </div>
                 )}
-                <MobileNav links={links} signedIn={!!me.user} />
+                <MobileNav links={links} signedIn={!!me.user} top={switcher("list")} />
               </div>
             </div>
           </header>

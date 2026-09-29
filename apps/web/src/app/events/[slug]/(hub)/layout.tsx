@@ -3,6 +3,7 @@ import { getEvent, getMyTeam } from "@/lib/data";
 import { getMe } from "@/lib/session";
 import { Cover, LogoTile } from "@/components/visuals";
 import { EventTabs } from "@/components/EventTabs";
+import { currentView, viewsFor } from "@/lib/view";
 
 const fmt = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(iso));
 
@@ -19,6 +20,9 @@ export default async function EventHubLayout({ children, params }: { children: R
   const { event, stats, myRoles } = data;
   const base = `/events/${slug}`;
   const isStaff = !!me.user?.isAdmin || myRoles.includes("organizer");
+  // With more than one view, each role's tab shows only in its own view (the header switches).
+  const view = await currentView(me);
+  const inView = (v: typeof view) => viewsFor(me).length < 2 || view === v;
 
   const tabs = [
     { href: base, label: "Overview", exact: true },
@@ -30,9 +34,9 @@ export default async function EventHubLayout({ children, params }: { children: R
     ...(event.votingWindow !== "off" && !event.votingPublished ? [{ href: `${base}/vote`, label: "Vote" }] : []),
     ...(event.votingPublished ? [{ href: `${base}/peoples-choice`, label: "People's Choice" }] : []),
     ...(event.resultsPublished ? [{ href: `${base}/results`, label: "Results" }] : []),
-    ...(me.user && (myRoles.includes("participant") || team?.team) ? [{ href: `${base}/team`, label: "My team" }] : []),
-    ...(myRoles.includes("judge") ? [{ href: `${base}/judging`, label: "Judging" }] : []),
-    ...(isStaff ? [{ href: `${base}/manage`, label: "Manage" }] : []),
+    ...(me.user && (myRoles.includes("participant") || team?.team) && inView("participant") ? [{ href: `${base}/team`, label: "My team" }] : []),
+    ...(myRoles.includes("judge") && inView("judge") ? [{ href: `${base}/judging`, label: "Judging" }] : []),
+    ...(isStaff && inView("organizer") ? [{ href: `${base}/manage`, label: "Manage" }] : []),
   ];
 
   return (

@@ -2855,8 +2855,8 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Create an account (or claim an imported one) and start a session",
-        "description": "**Who can call this:** Anyone. No sign-in needed (signing in may show more, e.g. your own drafts).",
+        "summary": "Create an account and start a session",
+        "description": "409 `email_taken` if the email already has an account. If it belongs to someone invited or imported who has no password yet, answers 202 `{ pending: true }` and emails them a one-time link to set one: registering never signs you in to an account you haven't proved is yours.\n\n**Who can call this:** Anyone. No sign-in needed (signing in may show more, e.g. your own drafts).",
         "x-access": "public",
         "security": [
           {},

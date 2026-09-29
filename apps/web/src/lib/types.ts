@@ -685,5 +685,5 @@ export type PairwiseReport = {
     rank: number; rankLow: number; rankHigh: number; rating: number; se: number; wins: number; losses: number; ties: number; comparisons: number;
     rubricRank: number | null; disagreement: boolean;
   }>;
-  judges: Array<{ judgeId: string; name: string; externalId: string | null; comparisons: number; ties: number; informative: number; agreement: number | null }>;
+  judges: Array<{ judgeId: string; name: string; externalId: string | null; comparisons: number; ties: number; informative: number; agreement: number | null; pAgainst: number | null; againstPanel: boolean }>;
 };

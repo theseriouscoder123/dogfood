@@ -1,0 +1,30 @@
+# .dogfood.toml: where the DOGFOOD checker finds things in this portal.
+#   docker compose up
+#   python3 run.py .dogfood.toml > acceptance-report.txt
+# run.py checks T1 and T2 only. T3 and T4 have no automated checks; README.md
+# ("What works, and how to see it") lists how to see each one for yourself.
+
+[portal]
+base_url = "http://localhost:8080"
+
+[tiers]
+claimed = ["T1", "T2", "T3", "T4"]
+pitch = "A self-hosted hackathon platform where judges can't see each other's work, scores are normalized for harsh and generous judges, and every result is audited, signed and verifiable."
+
+[auth]
+# Seeded sessions, printed by the API on every boot ("seeded. test logins").
+# judge_a is Diego Herrera (fixture jdg_24); judge_b is Jonas Vogel.
+organizer   = "Cookie: sid=seed-organizer"
+judge_a     = "Cookie: sid=seed-judge-a"
+judge_b     = "Cookie: sid=seed-judge-b"
+participant = "Cookie: sid=seed-participant"
+
+[routes]
+# The fixture event is imported as "sample-hack-2026". Its submissions have closed.
+gallery      = "/events/sample-hack-2026/projects"
+submit       = "/api/events/sample-hack-2026/projects"
+# "me" is the calling judge. peer_scores is judge_a's own scores by fixture id:
+# 200 for judge_a, 403 for judge_b and for participants.
+judge_scores = "/api/events/sample-hack-2026/judges/me/scores"
+peer_scores  = "/api/events/sample-hack-2026/judges/jdg_24/scores"
+csv_export   = "/api/events/sample-hack-2026/export/results.csv"

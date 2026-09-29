@@ -185,9 +185,10 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
 
       // Assign with the real engine, exactly as an organizer would.
       const seed = 2026;
+      // Ordered by title and name, not by id: ids are random, so every install gets the same plan.
       const plan = planAssignments({
-        projects: projects.map((p) => ({ id: p.id, trackId: p.trackId, teamId: p.teamId })).sort((a, b) => a.id.localeCompare(b.id)),
-        judges: judges.map((j) => ({ id: j.id, trackIds: j.tracks.map((t) => tracks[t]!.id).sort() })).sort((a, b) => a.id.localeCompare(b.id)),
+        projects: [...projects].sort((a, b) => a.title.localeCompare(b.title)).map((p) => ({ id: p.id, trackId: p.trackId, teamId: p.teamId })),
+        judges: [...judges].sort((a, b) => a.name.localeCompare(b.name)).map((j) => ({ id: j.id, trackIds: j.tracks.map((t) => tracks[t]!.id).sort() })),
         existing: [], blocked: [], conflicts: [], reviewsPerProject: 3, maxPerJudge: null, seed,
       });
       const batch = await tx.assignmentBatch.create({
@@ -212,7 +213,9 @@ export async function seedJudgingDemo(prisma: PrismaClient, organizerId: string,
             : j.profile === "half" ? (i === n - 1 ? "recused" : i < Math.floor(n / 2) ? "submitted" : "assigned")
             : i < 3 ? "submitted" : "assigned";
 
-          const minutes = between(...j.minutes);
+          // Farah (flat) is the planted rusher: exactly her first three reviews take under a minute.
+          const drawn = between(...j.minutes);
+          const minutes = j.flat !== undefined ? (i < 3 ? 0.7 : 1.5) : drawn;
           const submittedAt = new Date(from + span * ((i + between(0.15, 0.85)) / n));
           const openedAt = status === "assigned" && !(j.profile === "behind" && i === 1) ? null : new Date(submittedAt.getTime() - minutes * MIN);
 

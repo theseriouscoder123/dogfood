@@ -258,13 +258,13 @@ Import a copy of the fixtures to get an event with a past deadline and no ballot
 
 ## 7b. Head-to-head (pairwise) judging
 
-Event: Spring Build Sprint, which has head-to-head on and 75 seeded comparisons.
+Event: Spring Build Sprint, which has head-to-head on and about 75 seeded comparisons. The exact figures vary between installs (the pair picker follows the generated ids), so check the shape, not the numbers.
 
 - [ ] **PW-1** As the organizer, open Manage → **Head to head**. You should see:
-  - 75 comparisons, agreement about 0.9, no position bias;
-  - three rows marked **differs**;
-  - Ava Moreau at 27%, marked **against the panel** (she's the planted contrarian).
-- [ ] **PW-2** **comparisons.csv** downloads: 76 lines including the header, one `winner_project_id` per decided row. It's also listed on the Exports page.
+  - 73–75 comparisons, agreement roughly 0.65–0.95, no position bias;
+  - a few rows marked **differs**;
+  - Ava Moreau below 30%, marked **against the panel** (she's the planted contrarian), and **no other judge** marked.
+- [ ] **PW-2** **comparisons.csv** downloads: one line per comparison plus the header, one `winner_project_id` per decided row. It's also listed on the Exports page.
 - [ ] **PW-3** Log in as `judge@dogfood.local` and open Judging. The **Head to head** card is shown; open it.
   - Both projects are in your own queue.
   - ← / ↓ / → record a choice and the next pair loads. The counter goes up.

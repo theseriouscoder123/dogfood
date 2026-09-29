@@ -3,20 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { send } from "@/lib/client";
-import { Button, ErrorText, Field, inputClass } from "@/components/ui";
+import { Button, ErrorText, Field, inputClass, SuccessText } from "@/components/ui";
 
 export function RegisterForm({ next }: { next: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     setPending(true);
-    const r = await send("POST", "/api/auth/register", { name: form.get("name"), email: form.get("email"), password: form.get("password") });
+    const r = await send<{ pending?: boolean; message?: string }>("POST", "/api/auth/register", { name: form.get("name"), email: form.get("email"), password: form.get("password") });
     setPending(false);
     if (!r.ok) return setError(r.message);
+    // An invited account: the owner sets their password from the emailed link.
+    if (r.data?.pending) return setNotice(r.data.message ?? "Check your email to finish setting up your account.");
     router.push(next);
     router.refresh();
   }
@@ -33,6 +36,7 @@ export function RegisterForm({ next }: { next: string }) {
         <input name="password" type="password" required minLength={8} autoComplete="new-password" className={inputClass} />
       </Field>
       <ErrorText>{error}</ErrorText>
+      {notice && <SuccessText>{notice}</SuccessText>}
       <Button type="submit" size="lg" disabled={pending} className="w-full">
         {pending ? "Creating account…" : "Create account"}
       </Button>

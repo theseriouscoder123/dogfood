@@ -8,6 +8,8 @@ import { formatDate } from "@/lib/format";
 import type { EventSummary } from "@/lib/types";
 import { buttonClass, Pill } from "@/components/ui";
 import { LogoTile } from "@/components/visuals";
+import { VIEWS } from "@/components/viewMeta";
+import { currentView, viewsFor } from "@/lib/view";
 
 export const metadata = { title: "Dashboard" };
 
@@ -31,28 +33,32 @@ export default async function DashboardPage() {
   if (!me.user) redirect("/login?next=/dashboard");
   const [{ events }, all] = await Promise.all([api<{ events: DashEvent[] }>("/api/me/dashboard"), api<{ events: EventSummary[] }>("/api/events")]);
   const now = Date.now();
+  const view = await currentView(me);
+  const multi = viewsFor(me).length > 1;
 
   const deadlines = events
     .flatMap((e) => {
       const d: Array<{ at: string; label: string; href: string; event: string }> = [];
-      if (e.roles.includes("participant")) d.push({ at: e.submissionsCloseAt, label: e.participant?.project?.status === "submitted" ? "Submissions close (you're in)" : "Submit your project", href: `/events/${e.slug}/team`, event: e.name });
-      if (e.roles.includes("judge") && e.judgingClosesAt) d.push({ at: e.judgingClosesAt, label: `Finish judging (${e.judge!.submitted}/${e.judge!.assigned})`, href: `/events/${e.slug}/judging`, event: e.name });
-      if (e.roles.includes("organizer")) {
+      if (view === "participant" && e.roles.includes("participant")) d.push({ at: e.submissionsCloseAt, label: e.participant?.project?.status === "submitted" ? "Submissions close (you're in)" : "Submit your project", href: `/events/${e.slug}/team`, event: e.name });
+      if (view === "judge" && e.roles.includes("judge") && e.judgingClosesAt) d.push({ at: e.judgingClosesAt, label: `Finish judging (${e.judge!.submitted}/${e.judge!.assigned})`, href: `/events/${e.slug}/judging`, event: e.name });
+      if (view === "organizer" && e.roles.includes("organizer")) {
         d.push({ at: e.submissionsCloseAt, label: "Submissions close", href: `/events/${e.slug}/manage`, event: e.name });
         if (e.judgingClosesAt) d.push({ at: e.judgingClosesAt, label: "Judging closes", href: `/events/${e.slug}/manage/progress`, event: e.name });
       }
-      if (e.votingClosesAt) d.push({ at: e.votingClosesAt, label: "Voting closes", href: `/events/${e.slug}/vote`, event: e.name });
+      if (e.votingClosesAt && (view === "participant" || (view === "organizer" && e.roles.includes("organizer")))) d.push({ at: e.votingClosesAt, label: "Voting closes", href: `/events/${e.slug}/vote`, event: e.name });
       return d;
     })
     .filter((d) => new Date(d.at).getTime() > now)
     .sort((a, b) => a.at.localeCompare(b.at))
     .slice(0, 5);
 
-  const organizing = events.filter((e) => e.organizer);
-  const judging = events.filter((e) => e.judge);
-  const building = events.filter((e) => e.participant);
+  const organizing = view === "organizer" ? events.filter((e) => e.organizer) : [];
+  const judging = view === "judge" ? events.filter((e) => e.judge) : [];
+  const building = view === "participant" ? events.filter((e) => e.participant) : [];
   const mine = new Set(events.map((e) => e.slug));
-  const joinable = all.events.filter((e) => !mine.has(e.slug) && ["registration", "submissions"].includes(phaseOf(e).phase)).slice(0, 3);
+  const joinable = view === "participant" ? all.events.filter((e) => !mine.has(e.slug) && ["registration", "submissions"].includes(phaseOf(e).phase)).slice(0, 3) : [];
+  const empty = organizing.length + judging.length + building.length === 0;
+  const ViewIcon = VIEWS[view].icon;
 
   return (
     <div className="mx-auto max-w-7xl space-y-10 px-4 pt-10 sm:px-6">
@@ -60,18 +66,42 @@ export default async function DashboardPage() {
         <div>
           <p className="text-sm font-semibold text-muted">{greeting()},</p>
           <h1 className="text-3xl font-extrabold sm:text-4xl">{me.user.name.split(" ")[0]}</h1>
+          {multi && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
+              <ViewIcon className="size-3.5" /> {VIEWS[view].label} view · {VIEWS[view].blurb.toLowerCase()}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/hackathons" className={buttonClass("secondary", "md")}>
-            <Compass className="size-4" /> Browse hackathons
-          </Link>
-          <Link href="/events/new" className={buttonClass("primary", "md")}>
-            <PlusCircle className="size-4" /> Host a hackathon
-          </Link>
+          {view !== "organizer" && (
+            <Link href="/hackathons" className={buttonClass(view === "participant" ? "secondary" : "primary", "md")}>
+              <Compass className="size-4" /> Browse hackathons
+            </Link>
+          )}
+          {view !== "judge" && (
+            <Link href="/events/new" className={buttonClass("primary", "md")}>
+              <PlusCircle className="size-4" /> Host a hackathon
+            </Link>
+          )}
         </div>
       </div>
 
-      {events.length === 0 ? (
+      {empty && view === "organizer" ? (
+        <section className="rounded-2xl border border-dashed border-line-strong bg-surface p-8 text-center">
+          <Megaphone className="mx-auto size-7 text-primary" />
+          <h2 className="mt-3 text-lg font-bold">You aren&apos;t running a hackathon yet</h2>
+          <p className="mt-1 text-sm text-muted">Set dates, tracks and prizes. It stays private until you publish.</p>
+          <Link href="/events/new" className={buttonClass("primary", "md", "mt-4 gap-2")}>
+            <PlusCircle className="size-4" /> Host a hackathon
+          </Link>
+        </section>
+      ) : empty && view === "judge" ? (
+        <section className="rounded-2xl border border-dashed border-line-strong bg-surface p-8 text-center">
+          <Gavel className="mx-auto size-7 text-primary" />
+          <h2 className="mt-3 text-lg font-bold">No reviews assigned right now</h2>
+          <p className="mt-1 text-sm text-muted">When an organizer assigns you projects, they&apos;ll appear here with your deadline.</p>
+        </section>
+      ) : empty ? (
         <section className="grid gap-4 md:grid-cols-2">
           {[
             { href: "/hackathons", icon: Compass, title: "Join a hackathon", body: "Find one that's open, register, and build with a team." },

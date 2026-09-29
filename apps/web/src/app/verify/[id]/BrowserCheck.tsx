@@ -27,7 +27,7 @@ export function BrowserCheck({ status, serverValid, publicKeyPem, signedText, si
           {!valid ? "Signature invalid: do not trust this record" : status === "current" ? "Authentic and current" : status === "revoked" ? "Authentic, but revoked" : "Authentic, but superseded"}
         </p>
         <p className="text-sm text-ink-2">
-          {valid ? "Signed by the Dogfood portal with its Ed25519 key. Nothing in it has changed since." : "The statement doesn't match its signature: it was altered, or signed by someone else."}
+          {valid ? "Issued by the Dogfood portal. Nothing in it has changed since." : "The statement doesn't match its signature: it was altered, or signed by someone else."}
         </p>
       </div>
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-current/20 bg-surface px-3 py-1 text-xs font-semibold">

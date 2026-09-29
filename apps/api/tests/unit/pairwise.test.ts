@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choosePair, fitBradleyTerry, pairKey, pairwiseReport, positionBias, suggestedComparisons, winProbability, type Comparison } from "../../src/judging/pairwise";
+import { binomialLowerTail, choosePair, fitBradleyTerry, pairKey, pairwiseReport, positionBias, suggestedComparisons, winProbability, type Comparison } from "../../src/judging/pairwise";
 import { rng } from "../../src/judging/assign";
 import { rankBy, spearman } from "../../src/judging/normalize";
 
@@ -132,6 +132,16 @@ describe("organizer analysis", () => {
     const agreement = new Map(report.judges.map((j) => [j.judgeId, j.agreement!]));
     expect(agreement.get("j3")!).toBeLessThan(0.35);
     for (const [id, a] of agreement) if (id !== "j3") expect(a).toBeGreaterThan(0.6);
+    expect(report.judges.filter((j) => j.againstPanel).map((j) => j.judgeId)).toEqual(["j3"]);
+  });
+
+  it("only calls a judge 'against the panel' when chance can't explain it", () => {
+    expect(binomialLowerTail(0, 1)).toBeCloseTo(0.5);
+    expect(binomialLowerTail(10, 10)).toBeCloseTo(1);
+    expect(binomialLowerTail(2, 10)).toBeCloseTo(56 / 1024); // (1 + 10 + 45) / 2^10
+    // 3 of 9 is well within chance; 1 of 11 is not.
+    expect(binomialLowerTail(3, 9)).toBeGreaterThan(0.2);
+    expect(binomialLowerTail(1, 11)).toBeLessThan(0.01);
   });
 
   it("flags projects the rubric and the comparisons place far apart", () => {

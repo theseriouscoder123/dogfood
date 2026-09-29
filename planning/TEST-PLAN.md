@@ -73,7 +73,7 @@ From `apps/api` (the DB container must be running, because integration tests cre
 - [ ] **S-2** Sample Hack 2026 → Projects tab shows 40 projects. "Glass Signal" (prj_01) is present; prj_41 (the duplicate) is **not**.
 - [ ] **S-3** Log in as organizer → Manage → every sidebar page opens without an error. The pages are Dashboard, Details, Schedule, Tracks, Prizes, Submission form, Organizers, Rubric, Judges, Assignments, Progress, Integrity, Results and Exports.
 - [ ] **S-4** Sample Hack → Results tab (public, logged out) shows a podium and 40 ranked projects.
-- [ ] **S-5** Log in as `judge@dogfood.local` → Spring Build Sprint → Judging. The queue shows about 3 of 6 submitted. Open a "To review" project, press `7`, wait for "Saved", then reload: the score is still there.
+- [ ] **S-5** Log in as `judge@dogfood.local` → Spring Build Sprint → Judging. The queue shows 3 of 7 submitted. Open a "To review" project, press `7`, wait for "Saved", then reload: the score is still there.
 - [ ] **S-6** Toggle the theme (monitor icon, top right): light and dark both look right with no unreadable text. Reload: the choice sticks.
 - [ ] **S-7** Mailpit is reachable at http://localhost:8025.
 
@@ -156,7 +156,7 @@ From `apps/api` (the DB container must be running, because integration tests cre
 - [ ] **AS-8** Reassign an unstarted assignment. Try to delete or reassign a **submitted** one → refused.
 
 ### 5.4 Judge console (Spring Build Sprint as judge@dogfood.local)
-- [ ] **JC-1** Judging dashboard: a greeting, a progress bar (3/6), a countdown to close, and groups To review / In progress / Submitted.
+- [ ] **JC-1** Judging dashboard: a greeting, a progress bar (3/7), a countdown to close, and groups To review / In progress / Submitted.
 - [ ] **JC-2** Open a project: story on the left, sticky scoring panel on the right, weights shown per criterion.
 - [ ] **JC-3** **Keyboard:** focus starts on the first *unscored* criterion. Digits score it (`0` = 10 on 1–10 rubrics), ↑/↓ move between criteria, and the composite updates live.
 - [ ] **JC-4** Autosave: score two criteria, wait about a second → "Saved". Close the tab and reopen → the draft is kept; the dashboard shows "Draft saved".

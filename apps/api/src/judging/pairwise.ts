@@ -138,6 +138,20 @@ export function positionBias(comparisons: Comparison[]) {
   return { decided: n, leftWins, leftShare: n ? leftWins / n : null, z, flagged: n >= 20 && Math.abs(z) >= 2.58 };
 }
 
+/** P(X <= k) for X ~ Binomial(n, 1/2). */
+export function binomialLowerTail(k: number, n: number): number {
+  let term = 0.5 ** n; // C(n, 0) / 2^n
+  let sum = 0;
+  for (let i = 0; i <= Math.min(k, n); i++) {
+    sum += term;
+    term = (term * (n - i)) / (i + 1);
+  }
+  return Math.min(1, sum);
+}
+
+/** A judge is "against the panel" only if siding with it this rarely is unlikely by chance (one-sided, p < 0.05). */
+export const AGAINST_PANEL_P = 0.05;
+
 /**
  * How often each judge sided with the rest of the panel. The model is refitted without that
  * judge (leave-one-out), so a judge doesn't get credit for agreeing with themselves.
@@ -154,7 +168,12 @@ export function judgeAgreement(ids: string[], comparisons: Comparison[]) {
       informative++;
       if ((p > 0.5) === (c.outcome === "left")) agree++;
     }
-    return { judgeId, comparisons: comparisons.filter((c) => c.judgeId === judgeId).length, ties: comparisons.filter((c) => c.judgeId === judgeId && c.outcome === "tie").length, informative, agreement: informative ? agree / informative : null };
+    // Ten comparisons is a small sample: 3 of 9 happens by chance a quarter of the time, 1 of 11 doesn't.
+    const pAgainst = informative ? binomialLowerTail(agree, informative) : null;
+    return {
+      judgeId, comparisons: comparisons.filter((c) => c.judgeId === judgeId).length, ties: comparisons.filter((c) => c.judgeId === judgeId && c.outcome === "tie").length,
+      informative, agreement: informative ? agree / informative : null, pAgainst, againstPanel: pAgainst !== null && pAgainst < AGAINST_PANEL_P,
+    };
   });
 }
 

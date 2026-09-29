@@ -10,6 +10,12 @@ import { CommentThread } from "@/components/CommentThread";
 import { Avatar, Cover, LogoTile } from "@/components/visuals";
 import { buttonClass, Card, GithubIcon, Pill } from "@/components/ui";
 
+export async function generateMetadata({ params }: { params: Promise<{ slug: string; projectId: string }> }) {
+  const { slug, projectId } = await params;
+  const d = await api<ProjectDetail>(`/api/events/${encodeURIComponent(slug)}/projects/${encodeURIComponent(projectId)}`).catch(() => null);
+  return d ? { title: d.project.title } : {};
+}
+
 export default async function ProjectPage({ params }: { params: Promise<{ slug: string; projectId: string }> }) {
   const { slug, projectId } = await params;
   const [detail, { event }, comments] = await Promise.all([

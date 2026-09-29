@@ -1,0 +1,15 @@
+DOGFOOD 2026 acceptance report
+portal: http://localhost:8080
+claimed: T1 T2 T3 T4
+fixtures: data/fixtures.json
+
+T1  gallery is public ................. PASS
+T1  project from fixtures shown ....... PASS
+T1  closed event refuses submissions .. PASS
+T2  judge sees own scores ............. PASS
+T2  judge cannot see peer scores ...... PASS
+T2  participant blocked ............... PASS
+T2  csv export works .................. PASS
+
+claimed T1 T2 T3 T4, verified T1 T2
+note: claimed but not verified: T3 T4

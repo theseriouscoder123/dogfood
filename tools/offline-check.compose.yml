@@ -1,0 +1,20 @@
+# Prove the portal needs no internet at runtime.
+#
+#   docker compose build                     # building needs the network (npm, base images)
+#   docker compose -f docker-compose.yml -f tools/offline-check.compose.yml up -d
+#   docker compose exec api node -e "fetch('https://example.org').then(()=>console.log('ONLINE')).catch(e=>console.log('offline:', e.cause?.code))"
+#
+# Everything except the gateway sits on an internal network with no route out; the gateway
+# joins it too, so http://localhost:8080 still works. Mailpit and the demo webhook receiver
+# are reachable only inside that network while this override is on.
+networks:
+  offline:
+    internal: true
+
+services:
+  db: { networks: [offline] }
+  mail: { networks: [offline] }
+  api: { networks: [offline] }
+  hooks: { networks: [offline] }
+  web: { networks: [offline] }
+  gateway: { networks: [offline, default] }

@@ -20,7 +20,7 @@ export function DesktopNav({ links }: { links: NavLink[] }) {
         <Link
           key={l.href}
           href={l.href}
-          className={`rounded-lg px-3 py-2 transition ${isActive(path, l.href) ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink"}`}
+          className={`whitespace-nowrap rounded-lg px-3 py-2 transition ${isActive(path, l.href) ? "bg-surface-2 text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink"}`}
         >
           {l.label}
         </Link>
@@ -29,7 +29,7 @@ export function DesktopNav({ links }: { links: NavLink[] }) {
   );
 }
 
-export function MobileNav({ links, signedIn }: { links: NavLink[]; signedIn: boolean }) {
+export function MobileNav({ links, signedIn, top }: { links: NavLink[]; signedIn: boolean; top?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const path = usePathname();
   useEffect(() => setOpen(false), [path]);
@@ -49,6 +49,7 @@ export function MobileNav({ links, signedIn }: { links: NavLink[]; signedIn: boo
       {open &&
         createPortal(
         <div className="fixed inset-x-0 bottom-0 top-16 z-50 overflow-y-auto border-t border-line bg-bg px-4 pb-10 pt-4">
+          {top}
           <nav className="grid gap-1">
             {links.map((l) => {
               const Icon = ICONS[l.icon];

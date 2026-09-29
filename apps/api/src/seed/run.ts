@@ -13,6 +13,7 @@ import { seedPairwiseDemo } from "./pairwiseDemo";
 import { enqueuePing } from "../webhooks/outbox";
 import { issuable, issueRecords } from "../records/issue";
 import { notify, type Note } from "../notifications/notify";
+import { ensureHandle } from "../users/profile";
 
 const DEMO_PASSWORD = "dogfood2026";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "admin@dogfood.local").toLowerCase();
@@ -107,6 +108,16 @@ async function seedDemoProfiles() {
     const u = await prisma.user.findUnique({ where: { email }, select: { id: true, bio: true } });
     if (u && !u.bio) await prisma.user.update({ where: { id: u.id }, data: p });
   }
+  // The README tour links to /u/priya.
+  if (!(await prisma.user.findUnique({ where: { handle: "priya" } })))
+    await prisma.user.updateMany({ where: { email: "priya1@example.org", handle: null }, data: { handle: "priya" } });
+}
+
+/** Everyone gets a handle up front, so /u/<handle> links work before anyone opens their profile. */
+async function backfillHandles() {
+  const users = await prisma.user.findMany({ where: { handle: null }, select: { id: true, name: true, handle: true }, orderBy: { createdAt: "asc" } });
+  for (const u of users) await ensureHandle(u);
+  if (users.length) console.log(`assigned handles to ${users.length} people`);
 }
 
 /** A few notifications so the demo accounts' bells aren't empty on a fresh install. Keys make it idempotent. */
@@ -120,9 +131,14 @@ async function seedDemoNotifications(sampleEventId: string) {
   ]);
   if (!org || !judge || !priya || !sprint || !sample) return;
   const cert = await prisma.signedRecord.findFirst({ where: { eventId: sample.id, userId: priya.id, supersededById: null } });
+  const [assigned, submitted] = await Promise.all([
+    prisma.assignment.count({ where: { eventId: sprint.id, judgeId: judge.id, status: { not: "recused" } } }),
+    prisma.assignment.count({ where: { eventId: sprint.id, judgeId: judge.id, status: "submitted" } }),
+  ]);
+  const left = assigned - submitted;
   const notes: Note[] = [
-    { userId: judge.id, eventId: sprint.id, category: "judging", title: "6 projects to review", body: sprint.name, url: `/events/${sprint.slug}/judging`, key: "demo:judge:assigned" },
-    { userId: judge.id, eventId: sprint.id, category: "reminders", title: `Judging for ${sprint.name} closes soon`, body: "3 reviews left.", url: `/events/${sprint.slug}/judging`, key: "demo:judge:reminder" },
+    { userId: judge.id, eventId: sprint.id, category: "judging", title: `${assigned} projects to review`, body: sprint.name, url: `/events/${sprint.slug}/judging`, key: "demo:judge:assigned" },
+    { userId: judge.id, eventId: sprint.id, category: "reminders", title: `Judging for ${sprint.name} closes soon`, body: `${left} review${left === 1 ? "" : "s"} left.`, url: `/events/${sprint.slug}/judging`, key: "demo:judge:reminder" },
     { userId: org.id, eventId: sprint.id, category: "organizer", title: "A webhook keeps failing", body: "CRM sync: 503 Service Unavailable. Retrying with backoff.", url: `/events/${sprint.slug}/manage/webhooks`, key: "demo:org:webhook" },
     { userId: priya.id, eventId: sample.id, category: "results", title: `Results are out for ${sample.name}`, url: `/events/${sample.slug}/results`, key: "demo:priya:results" },
     ...(cert ? [{ userId: priya.id, eventId: sample.id, category: "results" as const, title: `Your certificate for ${sample.name} is ready`, url: `/certificates/${cert.id}`, key: "demo:priya:cert" }] : []),
@@ -132,9 +148,16 @@ async function seedDemoNotifications(sampleEventId: string) {
   if (n) await prisma.notification.updateMany({ where: { key: { startsWith: "demo:" } }, data: { emailWanted: false } });
 }
 
+/** SEED_DEMO=false: the fixed demo sessions, the demo API token and the demo webhooks stop working. */
+async function removeDemoAccess() {
+  const { count } = await prisma.session.deleteMany({ where: { seeded: true } });
+  const tokens = await prisma.apiToken.deleteMany({ where: { seeded: true } });
+  const hooks = await prisma.webhook.deleteMany({ where: { url: { startsWith: DEMO_RECEIVER } } });
+  console.log(`SEED_DEMO=false: removed ${count} demo sessions, ${tokens.count} demo API tokens and ${hooks.count} demo webhooks`);
+}
+
 async function main() {
   const seedStartedAt = new Date();
-  const fixture = JSON.parse(await readFile(config.fixturesPath, "utf8"));
   const demoHash = config.seedDemo ? await hashPassword(DEMO_PASSWORD) : null;
   const adminHash = process.env.ADMIN_PASSWORD ? await hashPassword(process.env.ADMIN_PASSWORD) : demoHash;
 
@@ -143,6 +166,16 @@ async function main() {
     update: process.env.ADMIN_PASSWORD ? { passwordHash: adminHash, isAdmin: true } : {},
     create: { email: ADMIN_EMAIL, name: "Portal Admin", isAdmin: true, passwordHash: adminHash },
   });
+  // A real install: no sample event, no demo people. Just the admin, who hosts from there.
+  if (process.env.SEED_FIXTURES === "false") {
+    if (!config.seedDemo) await removeDemoAccess();
+    if (!process.env.ADMIN_PASSWORD && !(await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } }))?.passwordHash)
+      console.warn(`${ADMIN_EMAIL} has no password: set ADMIN_PASSWORD, or use "Forgot password" on the login page.`);
+    console.log(`SEED_FIXTURES=false: no sample data. Sign in as ${ADMIN_EMAIL}.`);
+    return;
+  }
+
+  const fixture = JSON.parse(await readFile(config.fixturesPath, "utf8"));
   const organizer = await prisma.user.upsert({
     where: { email: ORGANIZER_EMAIL },
     update: {},
@@ -176,10 +209,7 @@ async function main() {
   }
 
   if (!config.seedDemo) {
-    const { count } = await prisma.session.deleteMany({ where: { seeded: true } });
-    const tokens = await prisma.apiToken.deleteMany({ where: { seeded: true } });
-    const hooks = await prisma.webhook.deleteMany({ where: { url: { startsWith: DEMO_RECEIVER } } });
-    console.log(`SEED_DEMO=false: removed ${count} demo sessions, ${tokens.count} demo API tokens and ${hooks.count} demo webhooks`);
+    await removeDemoAccess();
     return;
   }
 
@@ -218,6 +248,7 @@ async function main() {
 }
 
 main()
+  .then(backfillHandles)
   .catch((err) => {
     console.error("seed failed:", err);
     process.exitCode = 1;

@@ -37,17 +37,14 @@ export default function SignInLinkPage({ params }: { params: Promise<{ token: st
         >
           {pending ? "Signing in…" : "Continue"}
         </Button>
-        <ErrorText>
-          {error}
-          {error && (
-            <>
-              {" "}
-              <Link href="/" className="font-semibold underline">
-                Back to Dogfood
-              </Link>
-            </>
-          )}
-        </ErrorText>
+        {error && (
+          <ErrorText>
+            {error}{" "}
+            <Link href="/" className="font-semibold underline">
+              Back to Dogfood
+            </Link>
+          </ErrorText>
+        )}
       </div>
     </AuthShell>
   );
