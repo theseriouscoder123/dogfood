@@ -34,7 +34,7 @@ export async function enqueuePing(tx: Tx, webhook: { id: string; eventId: string
     type: PING_TYPE,
     timestamp: now.toISOString(),
     event,
-    data: { webhookId: webhook.id, message: "Test delivery from Dogfood. If you can read this, your endpoint works." },
+    data: { webhookId: webhook.id, message: "Test delivery from Verdict. If you can read this, your endpoint works." },
   };
   return tx.webhookDelivery.create({ data: { webhookId: webhook.id, messageId: payload.id, eventType: PING_TYPE, payload, nextAttemptAt: now } });
 }

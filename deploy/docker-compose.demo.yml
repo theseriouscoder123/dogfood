@@ -1,0 +1,42 @@
+# Public demo on a single VM: the normal stack plus Caddy for HTTPS.
+#   DEMO_HOST=1-2-3-4.sslip.io docker compose -f docker-compose.yml -f deploy/docker-compose.demo.yml up -d --build
+# deploy/setup-vm.sh writes DEMO_HOST into .env and runs this for you. See "Live demo" in README.md.
+services:
+  api:
+    restart: unless-stopped
+    environment:
+      PUBLIC_BASE_URL: https://${DEMO_HOST:?set DEMO_HOST, e.g. 1-2-3-4.sslip.io}
+      COOKIE_SECURE: "true"
+      # Caddy, then the gateway, append to X-Forwarded-For: trust both hops so limits see the real visitor.
+      TRUST_PROXY: "2"
+
+  db:
+    restart: unless-stopped
+  mail:
+    restart: unless-stopped
+  hooks:
+    restart: unless-stopped
+  web:
+    restart: unless-stopped
+  gateway:
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DEMO_HOST: ${DEMO_HOST}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - gateway
+
+volumes:
+  # Holds the HTTPS certificates. The demo reset never deletes it (certificate issuers limit re-issues).
+  caddy_data:
+  caddy_config:

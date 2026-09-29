@@ -16,7 +16,7 @@ import { ViewSwitcher } from "@/components/ViewSwitcher";
 import { currentView, viewsFor } from "@/lib/view";
 
 export const metadata: Metadata = {
-  title: { default: "Dogfood · Hackathons, judged fairly", template: "%s · Dogfood" },
+  title: { default: "Verdict · Hackathons, judged fairly", template: "%s · Verdict" },
   description: "Open-source, self-hostable hackathon platform: registration, teams, submissions and fair judging.",
 };
 
@@ -70,7 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 xl:gap-6">
               <Link href={me.user ? "/dashboard" : "/"} className="flex shrink-0 items-center gap-2.5">
                 <LogoMark />
-                <span className="font-display text-[19px] font-extrabold tracking-tight">Dogfood</span>
+                <span className="font-display text-[19px] font-extrabold tracking-tight">Verdict</span>
               </Link>
               <DesktopNav links={links} />
               <div className="ml-auto flex items-center gap-2">
@@ -101,7 +101,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div>
                 <div className="flex items-center gap-2.5">
                   <LogoMark size={24} />
-                  <span className="font-display text-base font-extrabold text-ink">Dogfood</span>
+                  <span className="font-display text-base font-extrabold text-ink">Verdict</span>
                 </div>
                 <p className="mt-3 max-w-xs text-muted">Run hackathons end to end: teams, submissions, judging, community voting and certificates. Open source, self-hosted.</p>
               </div>
@@ -125,7 +125,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               ))}
             </div>
             <div className="border-t border-line">
-              <p className="mx-auto max-w-7xl px-4 py-4 text-xs text-muted sm:px-6">© {new Date().getUTCFullYear()} Dogfood contributors · MIT License</p>
+              <p className="mx-auto max-w-7xl px-4 py-4 text-xs text-muted sm:px-6">© {new Date().getUTCFullYear()} Verdict contributors · MIT License</p>
             </div>
           </footer>
         </FeedbackProvider>

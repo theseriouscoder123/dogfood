@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Verify a Dogfood signed record without trusting the portal's own "valid" badge.
+// Verify a Verdict signed record without trusting the portal's own "valid" badge.
 // Needs only Node 18+ (no packages).
 //
 //   node tools/verify-record.mjs dogfood-record-<id>.json            # a downloaded record
@@ -50,7 +50,7 @@ async function load(src) {
 }
 
 const record = await load(source);
-if (record.format !== "dogfood-signed-record/v1" || record.alg !== "Ed25519") throw new Error("not a Dogfood signed record");
+if (record.format !== "dogfood-signed-record/v1" || record.alg !== "Ed25519") throw new Error("not a Verdict signed record");
 const text = canonicalJson(record.statement);
 
 let pem;

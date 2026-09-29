@@ -101,7 +101,7 @@ function operation(op: Operation): Json {
   };
 }
 
-const INTRO = `The REST API behind the Dogfood hackathon portal. The web app is built only on this API, so everything a person can do in the portal, a script can do here.
+const INTRO = `The REST API behind the Verdict hackathon portal. The web app is built only on this API, so everything a person can do in the portal, a script can do here.
 
 ## Authentication
 - **API tokens** (for scripts): create one under *Account → API tokens* and send \`Authorization: Bearer ${API_TOKEN_PREFIX}…\`. A token acts as you, narrowed by its scopes: \`read\` allows GET only, \`write\` allows changes. Only a hash is stored, and revoking takes effect on the next request.
@@ -156,7 +156,7 @@ export function buildSpec(serverUrl: string): Json {
   return {
     openapi: "3.1.0",
     info: {
-      title: "Dogfood API",
+      title: "Verdict API",
       version: "1.0.0",
       description: INTRO,
       license: { name: "MIT", identifier: "MIT" },

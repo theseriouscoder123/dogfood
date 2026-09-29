@@ -141,7 +141,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
                 )}
               </dl>
               <div>
-                <p className="font-semibold">With the verifier in the Dogfood repository (Node 18+, no packages)</p>
+                <p className="font-semibold">With the verifier in the Verdict repository (Node 18+, no packages)</p>
                 <pre className="mt-1 overflow-x-auto rounded-lg bg-ink px-3 py-2.5 font-mono text-xs text-bg">{`node tools/verify-record.mjs ${s.verify}`}</pre>
               </div>
               <div>

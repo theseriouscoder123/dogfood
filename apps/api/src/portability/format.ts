@@ -1,4 +1,4 @@
-// dogfood-event/v1: one whole event as a single JSON file, for moving an event between Dogfood
+// dogfood-event/v1: one whole event as a single JSON file, for moving an event between Verdict
 // installs (or into your own tools) and back. The exporter writes it; the importer reads it,
 // plus the DOGFOOD fixture format through an adapter.
 //

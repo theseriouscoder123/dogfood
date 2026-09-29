@@ -113,7 +113,7 @@ export async function issueRecords(event: Event, audit: Omit<AuditEntry, "action
           id,
           type: s.type,
           version: STATEMENT_VERSION,
-          issuer: { name: "Dogfood", url: config.publicBaseUrl },
+          issuer: { name: "Verdict", url: config.publicBaseUrl },
           kid: signer.kid,
           issuedAt,
           event: eventFacts,

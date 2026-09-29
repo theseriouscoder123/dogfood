@@ -98,7 +98,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
                 <p>Ed25519 key {s.kid}</p>
                 <p className="max-w-[26cqw] break-all font-mono">{s.verify}</p>
                 <p className="mt-[0.4cqw] flex items-center justify-end gap-[0.4cqw]">
-                  <LogoMark size={14} /> Dogfood
+                  <LogoMark size={14} /> Verdict
                 </p>
               </div>
               <div className="size-[8cqw] shrink-0" dangerouslySetInnerHTML={{ __html: qr }} />

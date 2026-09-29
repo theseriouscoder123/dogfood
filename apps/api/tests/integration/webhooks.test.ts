@@ -298,14 +298,14 @@ describe("chat formats", () => {
     await api().post(`${ctx.base}/projects/${project.id}/submit`).set("Cookie", member.cookie);
     await runWebhookWorkerOnce();
     const texts = hits.map((h) => JSON.parse(h.body).text as string);
-    expect(texts).toContain("Dogfood is connected. Updates from Test Event will appear here.");
+    expect(texts).toContain("Verdict is connected. Updates from Test Event will appear here.");
     expect(texts.find((t) => t.startsWith("“Nightjar” was submitted to Test Event."))).toContain(`/projects/${project.id}`);
 
     const discord = await addWebhook(ctx, { format: "discord", eventTypes: ["results.published"] });
     hits.length = 0;
     await api().post(`${ctx.base}/webhooks/${discord.id}/ping`).set("Cookie", ctx.organizer.cookie);
     await runWebhookWorkerOnce();
-    expect(JSON.parse(hits[0]!.body)).toMatchObject({ content: expect.stringContaining("Dogfood is connected"), allowed_mentions: { parse: [] } });
+    expect(JSON.parse(hits[0]!.body)).toMatchObject({ content: expect.stringContaining("Verdict is connected"), allowed_mentions: { parse: [] } });
     expect((await api().post(`${ctx.base}/webhooks`).set("Cookie", ctx.organizer.cookie).send({ url: `${base}/x`, format: "teams" })).status).toBe(400);
   });
 });

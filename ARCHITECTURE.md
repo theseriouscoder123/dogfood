@@ -146,7 +146,7 @@ Everything is an environment variable on the `api` service; `apps/api/src/config
 | Unit | `apps/api/tests/unit` | Policy table, judging maths (normalization, assignment, integrity, pairwise, progress), voting helpers, CSV, signatures and retries, OpenAPI drift. No database |
 | Integration | `apps/api/tests/integration` | The real Express app against a real Postgres. Each run creates a throwaway database, migrates it and drops it afterwards. Covers every tier, plus the access matrix |
 | Checker | `python3 run.py .dogfood.toml` | The organizers' T1 and T2 acceptance checks |
-| Manual | `planning/TEST-PLAN.md`, `planning/TEST-PLAN-2.md` | Click-through plans for the UI, including light, dark and phone widths |
+| Manual | Click-through test plans, run by hand | The UI in light, dark and phone widths; results are summarized in `planning/BUILD-JOURNAL.md` |
 
 ## Decisions, and what they cost
 

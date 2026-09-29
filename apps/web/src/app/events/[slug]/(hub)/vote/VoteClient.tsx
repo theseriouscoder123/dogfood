@@ -157,7 +157,7 @@ function Gate({ slug, data, loggedInEmail, code }: { slug: string; data: VoteVie
     );
 
   if (data.mode === "accounts" && data.status === "unauthenticated")
-    return card(<UserCheck className="size-5" />, "Log in to vote", "Voting in this event needs a Dogfood account.", <Link href={`/login?next=${encodeURIComponent(next)}`} className={buttonClass("primary", "lg")}>Log in</Link>);
+    return card(<UserCheck className="size-5" />, "Log in to vote", "Voting in this event needs a Verdict account.", <Link href={`/login?next=${encodeURIComponent(next)}`} className={buttonClass("primary", "lg")}>Log in</Link>);
 
   // Verified email: new visitors and signed-in accounts that haven't confirmed their address yet.
   if (sent)

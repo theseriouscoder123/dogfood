@@ -1,0 +1,18 @@
+# HTTPS for the public demo. Certificates are issued automatically for each name below.
+# sslip.io resolves <anything>.1-2-3-4.sslip.io to 1.2.3.4, so no domain or DNS account is needed.
+
+# The portal.
+{$DEMO_HOST} {
+	encode gzip
+	reverse_proxy gateway:80
+}
+
+# Mailpit: every email the portal sends (sign-in links, voting links, invites) lands here.
+mail.{$DEMO_HOST} {
+	reverse_proxy mail:8025
+}
+
+# The demo webhook receiver: shows each delivery and whether its signature verified.
+hooks.{$DEMO_HOST} {
+	reverse_proxy hooks:9000
+}

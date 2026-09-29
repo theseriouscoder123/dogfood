@@ -9,7 +9,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
         <div className="absolute -left-24 -top-24 size-80 rounded-full bg-[#3346f0] opacity-50 blur-[90px]" />
         <div className="absolute -bottom-24 -right-16 size-72 rounded-full bg-[#ff6b35] opacity-30 blur-[90px]" />
         <div className="relative">
-          <p className="text-sm font-semibold text-white/60">Dogfood</p>
+          <p className="text-sm font-semibold text-white/60">Verdict</p>
           <h2 className="mt-3 text-4xl font-extrabold leading-tight">
             Where builders ship,
             <br />

@@ -29,7 +29,7 @@ export const httpSend: Sender = async (url, headers, body) => {
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "User-Agent": "Dogfood-Webhooks/1.0", ...headers },
+      headers: { "Content-Type": "application/json", "User-Agent": "Verdict-Webhooks/1.0", ...headers },
       body,
       redirect: "manual",
       signal: AbortSignal.timeout(TIMEOUT_MS),

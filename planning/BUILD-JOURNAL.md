@@ -318,3 +318,11 @@ Log anything surprising as it happens: a number, a bug, a design you abandoned, 
   - *Why not pick a role at login:* roles are per event, and a judge following an emailed link shouldn't meet a picker first.
 - **Demo numbers now fixed per install:** Jordan has 7 reviews (3 done), and the seeded notifications count them instead of hardcoding them. Test plans and JUDGING.md updated. Head-to-head figures still vary a little (73–75 comparisons), because the pair picker hashes ids; the docs give ranges.
 - **Checked after the changes:** a clean rebuild (`down -v`, `up --build`), then API and web typecheck clean, 416/416 unit and 189/189 integration tests, and the checker at 7/7 (`acceptance-report.txt` regenerated with the same command and unchanged). The three failed cases, the view switcher, the signed-in page and the verify page were rerun in the browser and passed.
+
+## Renamed to Verdict (Sep 29)
+
+The product is now **Verdict**: the header, footer, page titles, emails, the signed records' issuer, the OpenAPI title, the webhook user agent and test message, the README title and the demo deck, plus a check-mark logo. Deliberately unchanged, so the checker and tests keep working: the repository, `.dogfood.toml`, the `@dogfood.local` logins, event slugs, the `dfp_` token prefix and the file formats (`dogfood-event/v1`, `dogfood-signed-record/v1`). Rechecked after a clean rebuild: checker 7/7 (report unchanged), 416/416 unit and 189/189 integration tests, the offline verifier accepts a newly signed record, and the README screenshots were retaken.
+
+## Free public demo (Sep 29)
+
+`deploy/`: an override that adds Caddy (automatic HTTPS) in front of the unchanged stack, an sslip.io address built from the VM's IP (no domain needed), `setup-vm.sh` for a fresh Oracle Always Free Ubuntu VM, and `reset-demo.sh`, which the setup schedules every 6 hours because the demo logins are public. The API gets `PUBLIC_BASE_URL=https://…`, `COOKIE_SECURE=true` and `TRUST_PROXY=2` (Caddy plus the gateway). Tested locally with `DEMO_HOST=localhost`: the portal, Mailpit and the receiver answered over HTTPS, sign-in set a `Secure` cookie, a forged `X-Forwarded-For` wasn't recorded, and the reset restored the seed while keeping the certificate volume. The checker passed 7/7 after switching back.

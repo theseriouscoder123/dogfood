@@ -16,7 +16,7 @@ export const config = {
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? "http://localhost:3000",
   /** e.g. smtp://mail:1025 (Mailpit) or smtps://user:pass@smtp.example.org. Unset = log emails to the console. */
   smtpUrl: process.env.SMTP_URL ?? "smtp://localhost:1025",
-  mailFrom: process.env.MAIL_FROM ?? "Dogfood <no-reply@dogfood.local>",
+  mailFrom: process.env.MAIL_FROM ?? "Verdict <no-reply@dogfood.local>",
   uploadDir: process.env.UPLOAD_DIR ?? path.resolve(process.cwd(), "uploads"),
   uploadMaxBytes: Number(process.env.UPLOAD_MAX_BYTES ?? 5 * 1024 * 1024),
   /**

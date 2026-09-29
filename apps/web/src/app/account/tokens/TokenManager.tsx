@@ -160,7 +160,7 @@ function NewToken({ secret, name, onDone }: { secret: string; name: string; onDo
       <h2 className="flex items-center gap-2 text-[17px] font-bold text-success">
         <Check className="size-5" /> “{name}” is ready. Copy it now.
       </h2>
-      <p className="mt-1 text-sm text-ink-2">This is the only time the token is shown. Dogfood stores a hash of it, not the token itself.</p>
+      <p className="mt-1 text-sm text-ink-2">This is the only time the token is shown. Verdict stores a hash of it, not the token itself.</p>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <code className="min-w-0 flex-1 break-all rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm">{secret}</code>
         <Button variant="secondary" onClick={copy}>

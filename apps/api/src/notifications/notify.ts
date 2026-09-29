@@ -190,7 +190,7 @@ export async function sendNotificationEmails(limit = 20): Promise<number> {
   for (const n of due) {
     // Marked first: a failed send is logged by sendMail and not retried, so nobody gets duplicates.
     await prisma.notification.update({ where: { id: n.id }, data: { emailedAt: new Date() } });
-    await sendMail({ to: n.user.email, subject: n.title, heading: n.title, body: [n.body].filter(Boolean), action: { label: "Open Dogfood", url: absoluteUrl(n.url) } });
+    await sendMail({ to: n.user.email, subject: n.title, heading: n.title, body: [n.body].filter(Boolean), action: { label: "Open Verdict", url: absoluteUrl(n.url) } });
   }
   return due.length;
 }

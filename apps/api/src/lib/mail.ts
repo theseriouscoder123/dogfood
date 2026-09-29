@@ -16,7 +16,7 @@ function render(m: Mail): { text: string; html: string } {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:14px;border:1px solid #e3e6f0">
 <tr><td style="padding:22px 28px;border-bottom:1px solid #eef0f6;font-weight:700;font-size:15px;letter-spacing:.2px">
-<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#3346f0;margin-right:8px"></span>Dogfood</td></tr>
+<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#3346f0;margin-right:8px"></span>Verdict</td></tr>
 <tr><td style="padding:28px">
 <h1 style="margin:0 0 14px;font-size:20px">${escape(m.heading)}</h1>
 ${m.body.map((p) => `<p style="margin:0 0 12px;line-height:1.55;color:#40465e">${escape(p)}</p>`).join("")}

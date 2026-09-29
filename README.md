@@ -1,8 +1,8 @@
-# Dogfood
+# Verdict
 
 A self-hostable hackathon platform: registration, teams, submissions, judging, community voting, results and certificates, in one `docker compose up`.
 
-It was built for DOGFOOD 2026 and focuses on the part most tools get wrong: **judging you can defend**.
+It was built for DOGFOOD 2026 and focuses on the part most tools get wrong: **judging you can defend**. (The repository, config files, demo accounts and event slugs keep the working name `dogfood`.)
 - Judges can't see each other's work, and the API enforces that, not the page.
 - Scores are adjusted for harsh and generous judges, using a documented, tested model.
 - Every change goes into a hash-chained audit log.
@@ -10,7 +10,19 @@ It was built for DOGFOOD 2026 and focuses on the part most tools get wrong: **ju
 
 Tiers claimed: **T1, T2, T3 and T4**. The official checker verifies T1 and T2 ([acceptance-report.txt](acceptance-report.txt)); T3 and T4 have no automated checks, so [the tier table](#whats-built-tier-by-tier) below shows how to see each one yourself.
 
+![Results for the fixture event: each project's raw average beside its adjusted score, rank movement and a likely-rank range](docs/screenshots/04-results-adjusted.png)
+
 ---
+
+## Live demo
+
+**[https://&lt;demo-address&gt;](#)**: the portal, with the same seeded data as a fresh install. Every account's password is `dogfood2026`; start with `organizer@dogfood.local`, `judge@dogfood.local` or `priya1@example.org` (more in [Test logins](#test-logins)). Emails the portal sends (sign-in and voting links) arrive at **https://mail.&lt;demo-address&gt;**. The demo resets to fresh data every 6 hours, so feel free to change anything.
+
+It runs on one free VM with the same `docker compose` stack, plus [Caddy](https://caddyserver.com) for HTTPS. The address comes from [sslip.io](https://sslip.io), which turns the VM's IP into a hostname, so no domain is needed. To host your own:
+
+1. Create an Ubuntu 22.04/24.04 VM with a public IP. Suggested: Oracle Cloud Always Free (Ampere A1, 2 OCPU / 12 GB) or Google Cloud e2-medium on the free trial credit. Allow inbound TCP 80 and 443 in the cloud firewall. On Google Cloud, promote the external IP to static, because the address is built from it.
+2. On the VM: `git clone <this repository> verdict && cd verdict && bash deploy/setup-vm.sh`. It installs Docker, opens 80 and 443 in the VM's own firewall, and starts the stack with `deploy/docker-compose.demo.yml`. It prints `https://<ip>.sslip.io`, plus `mail.` and `hooks.` addresses for the inbox and the webhook receiver.
+3. `deploy/reset-demo.sh` runs every 6 hours, because the demo logins are public. It restores fresh demo data and keeps the signing key and the HTTPS certificates. Use it instead of `down -v`, which would force new certificates.
 
 ## Quick start
 
@@ -109,6 +121,29 @@ Roles are per event, so one account can build in one hackathon and judge another
 - `/developers` has the full API reference and the webhook event catalogue.
 - `/verify/<id>` checks a certificate's signature in your browser.
 - `node tools/verify-record.mjs <link>` checks one offline, with no dependencies.
+
+## Screenshots
+
+Taken from a fresh `docker compose up`, in dark mode. Light mode and phone widths work too. To retake them: `node tools/screenshots.mjs` (Node 22 and Chrome, with the stack running).
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/01-results-public.png" alt="Public results page with the podium"><br><b>Public results.</b> The podium and full ranking, visible once judging has closed and results are published.</td>
+<td width="50%"><img src="docs/screenshots/02-dashboard-organizer.png" alt="Organizer dashboard in Organizer view"><br><b>Organizer view.</b> The switcher in the header shows one role's work at a time.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/03-judge-scoring.png" alt="Judge scoring a project against the weighted rubric"><br><b>Judging.</b> A weighted rubric, scored from the keyboard, with drafts saved as you go.</td>
+<td><img src="docs/screenshots/09-progress.png" alt="Judging progress with judges behind and a pace chart"><br><b>Progress.</b> Reviews against a steady pace, who's behind, and reminders.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/05-integrity.png" alt="Integrity page with flags and the low-agreement warning"><br><b>Integrity.</b> Flags for a person to decide, and an honest warning when judges barely agree.</td>
+<td><img src="docs/screenshots/06-head-to-head.png" alt="Head-to-head ranking beside the rubric rank"><br><b>Head to head.</b> A Bradley–Terry ranking with rank ranges, checked against the rubric.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/07-vote-review.png" alt="Vote review showing a ballot-stuffing incident"><br><b>Vote review.</b> A planted stuffing ring, grouped into one incident with its evidence.</td>
+<td><img src="docs/screenshots/08-verify-certificate.png" alt="Certificate verification page"><br><b>Verify a certificate.</b> The signature is re-checked in the visitor's own browser.</td>
+</tr>
+</table>
 
 ---
 
@@ -237,7 +272,7 @@ npm run dev:web                # http://localhost:3000
 - `npm run audit:verify`: re-hashes the audit chain.
 - `npm run openapi`: regenerates `docs/openapi.json`. A test fails if the spec and the mounted routes drift apart.
 
-There are no automated browser tests. The web app was checked by hand in light and dark, and at phone width, with [planning/TEST-PLAN.md](planning/TEST-PLAN.md) and [planning/TEST-PLAN-2.md](planning/TEST-PLAN-2.md).
+There are no automated browser tests. The web app was checked by hand in light and dark, and at phone width, against written test plans; the build journal records what those runs found.
 
 ---
 

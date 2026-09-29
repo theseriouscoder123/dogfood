@@ -26,7 +26,7 @@ export default async function ExportsPage({ params }: { params: Promise<{ slug: 
           <h2 className="font-bold">The whole event, in one file</h2>
           <p className="text-sm text-ink-2">
             Settings, tracks, prizes, rubric, people, teams, projects, judges and every review, as <code className="font-mono text-xs">dogfood-event/v1</code> JSON. Import it into
-            any Dogfood install (Import an event) and you get the same event back, with the same ranking. Passwords, ballots, comments and signed records stay here.
+            any Verdict install (Import an event) and you get the same event back, with the same ranking. Passwords, ballots, comments and signed records stay here.
           </p>
         </div>
         <a href={`/api/events/${encodeURIComponent(slug)}/export/event.json`} download className={buttonClass("primary", "md")}>

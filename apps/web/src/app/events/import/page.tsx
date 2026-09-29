@@ -18,7 +18,7 @@ export default async function ImportPage() {
         <>
           <h1 className="text-3xl font-extrabold sm:text-4xl">Import an event</h1>
           <p className="mb-8 mt-2 text-muted">
-            A Dogfood event file (Exports → Full event) or a DOGFOOD <code className="font-mono text-sm">fixtures.json</code>. Prefer a blank start?{" "}
+            A Verdict event file (Exports → Full event) or a DOGFOOD <code className="font-mono text-sm">fixtures.json</code>. Prefer a blank start?{" "}
             <Link href="/events/new" className="font-semibold text-primary hover:underline">
               Create an event
             </Link>

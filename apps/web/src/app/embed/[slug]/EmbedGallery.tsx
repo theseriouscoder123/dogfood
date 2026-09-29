@@ -112,7 +112,7 @@ export function EmbedGallery({ slug, eventName, tracks, projects, ranks, initial
       )}
 
       <a href={home} target="_blank" rel="noopener" className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-muted hover:text-ink">
-        <LogoMark size={14} /> Hosted on Dogfood <ArrowUpRight className="size-3" />
+        <LogoMark size={14} /> Hosted on Verdict <ArrowUpRight className="size-3" />
       </a>
     </div>
   );

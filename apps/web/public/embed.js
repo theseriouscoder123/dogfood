@@ -1,5 +1,5 @@
 /*
- * Dogfood gallery embed. Put this where the gallery should appear:
+ * Verdict gallery embed. Put this where the gallery should appear:
  *
  *   <script src="https://YOUR-PORTAL/embed.js" data-event="your-event-slug" async></script>
  *

@@ -122,7 +122,7 @@ async function emailPasswordLink(user: { id: string; email: string; name: string
       await prisma.passwordReset.create({ data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) } });
       await sendMail({
         to: user.email,
-        subject: "Reset your Dogfood password",
+        subject: "Reset your Verdict password",
         heading: `Hi ${user.name}, reset your password`,
         body: [
           user.passwordHash
@@ -191,8 +191,8 @@ authRouter.post("/link", async (req, res) => {
     const event = slug ? await prisma.event.findUnique({ where: { slug }, select: { name: true } }) : null;
     await sendMail({
       to: body.email,
-      subject: event ? `Your voting link for ${event.name}` : "Your Dogfood sign-in link",
-      heading: event ? `Vote in ${event.name}` : "Sign in to Dogfood",
+      subject: event ? `Your voting link for ${event.name}` : "Your Verdict sign-in link",
+      heading: event ? `Vote in ${event.name}` : "Sign in to Verdict",
       body: [
         event ? "Use this link to confirm your email and open your ballot." : "Use this link to sign in.",
         "It works once and expires in 30 minutes. If you didn't ask for it, ignore this email.",

@@ -41,7 +41,7 @@ export default function SignInLinkPage({ params }: { params: Promise<{ token: st
           <ErrorText>
             {error}{" "}
             <Link href="/" className="font-semibold underline">
-              Back to Dogfood
+              Back to Verdict
             </Link>
           </ErrorText>
         )}

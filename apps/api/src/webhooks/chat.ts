@@ -57,7 +57,7 @@ export function chatText(p: Payload): string {
     case "event.updated":
       return `${ev} was updated (${Array.isArray(d.changed) ? d.changed.join(", ") : "details"}).`;
     case "webhook.ping":
-      return `Dogfood is connected. Updates from ${ev} will appear here.`;
+      return `Verdict is connected. Updates from ${ev} will appear here.`;
     default:
       return `${p.type} in ${ev}.`;
   }
