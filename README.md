@@ -14,16 +14,6 @@ Tiers claimed: **T1, T2, T3 and T4**. The official checker verifies T1 and T2 ([
 
 ---
 
-## Live demo
-
-**[https://&lt;demo-address&gt;](#)**: the portal, with the same seeded data as a fresh install. Every account's password is `dogfood2026`; start with `organizer@dogfood.local`, `judge@dogfood.local` or `priya1@example.org` (more in [Test logins](#test-logins)). Emails the portal sends (sign-in and voting links) arrive at **https://mail.&lt;demo-address&gt;**. The demo resets to fresh data every 6 hours, so feel free to change anything.
-
-It runs on one free VM with the same `docker compose` stack, plus [Caddy](https://caddyserver.com) for HTTPS. The address comes from [sslip.io](https://sslip.io), which turns the VM's IP into a hostname, so no domain is needed. To host your own:
-
-1. Create an Ubuntu 22.04/24.04 VM with a public IP. Suggested: Oracle Cloud Always Free (Ampere A1, 2 OCPU / 12 GB) or Google Cloud e2-medium on the free trial credit. Allow inbound TCP 80 and 443 in the cloud firewall. On Google Cloud, promote the external IP to static, because the address is built from it.
-2. On the VM: `git clone <this repository> verdict && cd verdict && bash deploy/setup-vm.sh`. It installs Docker, opens 80 and 443 in the VM's own firewall, and starts the stack with `deploy/docker-compose.demo.yml`. It prints `https://<ip>.sslip.io`, plus `mail.` and `hooks.` addresses for the inbox and the webhook receiver.
-3. `deploy/reset-demo.sh` runs every 6 hours, because the demo logins are public. It restores fresh demo data and keeps the signing key and the HTTPS certificates. Use it instead of `down -v`, which would force new certificates.
-
 ## Quick start
 
 You need Docker (with Compose v2) and nothing else.
